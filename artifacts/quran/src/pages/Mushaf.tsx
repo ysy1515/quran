@@ -21,6 +21,7 @@ interface SelectedVerse {
   verseNumber: number;
   surahName: string;
   verseText: string;
+  translationText?: string | null;
 }
 
 export default function Mushaf() {
@@ -30,6 +31,7 @@ export default function Mushaf() {
   const [selectedVerse, setSelectedVerse] = useState<SelectedVerse | null>(null);
   const [tafsirOpen, setTafsirOpen] = useState(false);
   const [fontSize, setFontSize] = useState(100);
+  const [showTranslation, setShowTranslation] = useState(false);
 
   const { data: surahs } = useListSurahs({
     query: { queryKey: getListSurahsQueryKey() },
@@ -65,7 +67,6 @@ export default function Mushaf() {
   const surah = versesData?.surah;
   const verses = versesData?.verses ?? [];
 
-  // Save reading progress when surah loads
   useEffect(() => {
     if (surah) {
       updateProgress.mutate({
@@ -82,13 +83,14 @@ export default function Mushaf() {
       (b) => b.surahNumber === surahNumber && b.verseNumber === verseNum
     ) ?? false;
 
-  const handleVerseClick = (verse: { verseNumber: number; text: string }) => {
+  const handleVerseClick = (verse: { verseNumber: number; text: string; translationText?: string | null }) => {
     if (!surah) return;
     setSelectedVerse({
       surahNumber,
       verseNumber: verse.verseNumber,
       surahName: surah.name,
       verseText: verse.text,
+      translationText: verse.translationText,
     });
     setTafsirOpen(true);
   };
@@ -96,23 +98,16 @@ export default function Mushaf() {
   const handleBookmark = (e: React.MouseEvent, verse: { verseNumber: number; pageNumber: number }) => {
     e.stopPropagation();
     if (!surah) return;
-
     const existing = bookmarks?.find(
       (b) => b.surahNumber === surahNumber && b.verseNumber === verse.verseNumber
     );
-
     if (existing) {
       deleteBookmark.mutate({ id: existing.id }, {
         onSuccess: () => toast.success("تمت إزالة العلامة المرجعية"),
       });
     } else {
       createBookmark.mutate(
-        {
-          pageNumber: verse.pageNumber,
-          surahNumber,
-          verseNumber: verse.verseNumber,
-          surahName: surah.name,
-        },
+        { pageNumber: verse.pageNumber, surahNumber, verseNumber: verse.verseNumber, surahName: surah.name },
         { onSuccess: () => toast.success("تمت إضافة العلامة المرجعية") }
       );
     }
@@ -124,7 +119,7 @@ export default function Mushaf() {
   return (
     <div className="page-enter max-w-3xl mx-auto px-4 py-6" dir="rtl">
       {/* Top Controls */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-2 mb-6">
         {/* Surah Selector */}
         <div className="flex-1">
           <select
@@ -141,11 +136,35 @@ export default function Mushaf() {
           </select>
         </div>
 
+        {/* Language Toggle AR / EN */}
+        <div className="flex items-center bg-muted rounded-lg p-0.5 text-xs font-bold flex-shrink-0">
+          <button
+            onClick={() => setShowTranslation(false)}
+            className={`px-3 py-1.5 rounded-md transition-all ${
+              !showTranslation
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            عربي
+          </button>
+          <button
+            onClick={() => setShowTranslation(true)}
+            className={`px-3 py-1.5 rounded-md transition-all ${
+              showTranslation
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            EN
+          </button>
+        </div>
+
         {/* Font size */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={() => setFontSize(Math.max(80, fontSize - 10))}
-            className="w-8 h-8 rounded-lg bg-muted hover:bg-border transition-colors flex items-center justify-center text-sm font-bold text-muted-foreground"
+            className="w-8 h-8 rounded-lg bg-muted hover:bg-border transition-colors flex items-center justify-center text-xs font-bold text-muted-foreground"
           >
             ص
           </button>
@@ -165,7 +184,7 @@ export default function Mushaf() {
             سورة {surah.name}
           </p>
           <p className="text-sm text-muted-foreground">
-            {surah.nameSimple} • {surah.revelationType === "Meccan" ? "مكية" : "مدنية"} • {surah.versesCount} آية
+            {surah.nameSimple} • {surah.nameTranslation} • {surah.revelationType === "Meccan" ? "مكية" : "مدنية"} • {surah.versesCount} آية
           </p>
           {surahNumber !== 9 && (
             <p className="font-quran text-xl text-primary/80 mt-3">
@@ -210,15 +229,13 @@ export default function Mushaf() {
             >
               <div className="flex items-start gap-3">
                 {/* Verse Number */}
-                <div
-                  className="verse-number flex-shrink-0 mt-1"
-                  style={{ fontSize: "0.65rem" }}
-                >
+                <div className="verse-number flex-shrink-0 mt-1" style={{ fontSize: "0.65rem" }}>
                   {verse.verseNumber}
                 </div>
 
-                {/* Verse Text */}
+                {/* Verse Content */}
                 <div className="flex-1">
+                  {/* Arabic Text — always shown */}
                   <p
                     className="font-quran text-foreground text-right leading-loose"
                     style={{ fontSize: `${fontSize}%` }}
@@ -226,6 +243,17 @@ export default function Mushaf() {
                   >
                     {verse.text}
                   </p>
+
+                  {/* English Translation — shown when EN mode active */}
+                  {showTranslation && verse.translationText && (
+                    <p
+                      className="text-sm text-muted-foreground mt-2 leading-relaxed border-t border-border/50 pt-2"
+                      dir="ltr"
+                      style={{ textAlign: "left", fontFamily: "sans-serif" }}
+                    >
+                      {verse.translationText}
+                    </p>
+                  )}
                 </div>
 
                 {/* Bookmark Button */}
@@ -265,9 +293,7 @@ export default function Mushaf() {
           </svg>
           السورة التالية
         </button>
-
         <span className="text-xs text-muted-foreground">{surahNumber} / 114</span>
-
         <button
           onClick={prevSurah}
           disabled={surahNumber <= 1}
@@ -289,6 +315,7 @@ export default function Mushaf() {
           verseNumber={selectedVerse.verseNumber}
           surahName={selectedVerse.surahName}
           verseText={selectedVerse.verseText}
+          translationText={selectedVerse.translationText}
         />
       )}
     </div>

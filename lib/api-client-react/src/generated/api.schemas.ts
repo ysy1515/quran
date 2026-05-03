@@ -37,8 +37,10 @@ export interface Verse {
   /** e.g. "1:1" */
   verseKey: string;
   verseNumber: number;
-  /** Arabic Quranic text */
+  /** Arabic Quranic text (Uthmani script) */
   text: string;
+  /** English translation (Sahih International) */
+  translationText?: string | null;
   pageNumber: number;
   juzNumber: number;
   hizbNumber: number;

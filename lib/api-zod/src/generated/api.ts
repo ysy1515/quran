@@ -51,7 +51,11 @@ export const GetSurahVersesResponse = zod.object({
       id: zod.string(),
       verseKey: zod.string().describe('e.g. \"1:1\"'),
       verseNumber: zod.number(),
-      text: zod.string().describe("Arabic Quranic text"),
+      text: zod.string().describe("Arabic Quranic text (Uthmani script)"),
+      translationText: zod
+        .string()
+        .nullish()
+        .describe("English translation (Sahih International)"),
       pageNumber: zod.number(),
       juzNumber: zod.number(),
       hizbNumber: zod.number(),
@@ -110,7 +114,11 @@ export const GetPageResponse = zod.object({
       id: zod.string(),
       verseKey: zod.string().describe('e.g. \"1:1\"'),
       verseNumber: zod.number(),
-      text: zod.string().describe("Arabic Quranic text"),
+      text: zod.string().describe("Arabic Quranic text (Uthmani script)"),
+      translationText: zod
+        .string()
+        .nullish()
+        .describe("English translation (Sahih International)"),
       pageNumber: zod.number(),
       juzNumber: zod.number(),
       hizbNumber: zod.number(),

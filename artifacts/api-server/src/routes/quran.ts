@@ -75,7 +75,7 @@ router.get("/surahs/:number/verses", async (req, res): Promise<void> => {
   try {
     const [versesResp, chapterResp] = await Promise.all([
       fetch(
-        `${QURAN_API_BASE}/verses/by_chapter/${params.data.number}?language=ar&words=false&page=${page}&per_page=${perPage}&fields=text_uthmani,page_number,juz_number,hizb_number`,
+        `${QURAN_API_BASE}/verses/by_chapter/${params.data.number}?language=ar&words=false&page=${page}&per_page=${perPage}&fields=text_uthmani,page_number,juz_number,hizb_number&translations=20`,
         { headers: { Accept: "application/json" } }
       ),
       fetch(
@@ -99,6 +99,7 @@ router.get("/surahs/:number/verses", async (req, res): Promise<void> => {
           page_number: number;
           juz_number: number;
           hizb_number: number;
+          translations?: Array<{ text: string; resource_id: number }>;
         }>;
         pagination: { total_records: number };
       }>,
@@ -134,6 +135,7 @@ router.get("/surahs/:number/verses", async (req, res): Promise<void> => {
       verseKey: v.verse_key,
       verseNumber: v.verse_number,
       text: v.text_uthmani,
+      translationText: v.translations?.[0]?.text?.replace(/<[^>]*>/g, "").trim() ?? null,
       pageNumber: v.page_number,
       juzNumber: v.juz_number,
       hizbNumber: v.hizb_number ?? 0,

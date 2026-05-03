@@ -360,7 +360,11 @@ components:
           type: integer
         text:
           type: string
-          description: Arabic Quranic text
+          description: Arabic Quranic text (Uthmani script)
+        translationText:
+          type: string
+          nullable: true
+          description: English translation (Sahih International)
         pageNumber:
           type: integer
         juzNumber:
