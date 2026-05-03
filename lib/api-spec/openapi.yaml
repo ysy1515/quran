@@ -3,20 +3,27 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Quran App API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: quran
+    description: Quran data operations
+  - name: bookmarks
+    description: Bookmark management
+  - name: progress
+    description: Reading progress
+  - name: settings
+    description: App settings
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +31,277 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /surahs:
+    get:
+      operationId: listSurahs
+      tags: [quran]
+      summary: List all surahs
+      responses:
+        "200":
+          description: List of all 114 surahs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Surah"
+
+  /surahs/{number}/verses:
+    get:
+      operationId: getSurahVerses
+      tags: [quran]
+      summary: Get verses for a surah
+      parameters:
+        - name: number
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: perPage
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Surah verses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersesResponse"
+
+  /verses/{surahNumber}/{verseNumber}/tafsir:
+    get:
+      operationId: getVerseTafsir
+      tags: [quran]
+      summary: Get tafsir for a specific verse
+      parameters:
+        - name: surahNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: verseNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: tafsirId
+          in: query
+          schema:
+            type: integer
+            default: 169
+            description: Tafsir ID (169 = Ibn Kathir Arabic)
+      responses:
+        "200":
+          description: Tafsir for the verse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TafsirResponse"
+        "404":
+          description: Tafsir not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Tafsir service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /pages/{pageNumber}:
+    get:
+      operationId: getPage
+      tags: [quran]
+      summary: Get verses for a specific Mushaf page
+      parameters:
+        - name: pageNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 604
+      responses:
+        "200":
+          description: Page data with verses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponse"
+
+  /juz:
+    get:
+      operationId: listJuz
+      tags: [quran]
+      summary: List all 30 juz with metadata
+      responses:
+        "200":
+          description: List of juz
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Juz"
+
+  /search:
+    get:
+      operationId: searchQuran
+      tags: [quran]
+      summary: Search surahs by name or verse number
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: language
+          in: query
+          schema:
+            type: string
+            default: ar
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+
+  /bookmarks:
+    get:
+      operationId: getBookmarks
+      tags: [bookmarks]
+      summary: Get all bookmarks for the session
+      responses:
+        "200":
+          description: List of bookmarks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bookmark"
+    post:
+      operationId: createBookmark
+      tags: [bookmarks]
+      summary: Create a new bookmark
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookmarkBody"
+      responses:
+        "201":
+          description: Bookmark created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bookmark"
+
+  /bookmarks/{id}:
+    delete:
+      operationId: deleteBookmark
+      tags: [bookmarks]
+      summary: Delete a bookmark
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bookmark deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /reading-progress:
+    get:
+      operationId: getReadingProgress
+      tags: [progress]
+      summary: Get current reading progress
+      responses:
+        "200":
+          description: Reading progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadingProgress"
+    put:
+      operationId: updateReadingProgress
+      tags: [progress]
+      summary: Update reading progress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReadingProgressBody"
+      responses:
+        "200":
+          description: Progress updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadingProgress"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get app settings
+      responses:
+        "200":
+          description: App settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppSettings"
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update app settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingsBody"
+      responses:
+        "200":
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppSettings"
+
+  /stats:
+    get:
+      operationId: getReadingStats
+      tags: [progress]
+      summary: Get reading statistics and summary
+      responses:
+        "200":
+          description: Reading statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadingStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +312,330 @@ components:
       required:
         - status
 
+    Surah:
+      type: object
+      properties:
+        id:
+          type: integer
+        number:
+          type: integer
+        name:
+          type: string
+          description: Arabic name
+        nameSimple:
+          type: string
+          description: English transliteration
+        nameTranslation:
+          type: string
+          description: English translation
+        revelationType:
+          type: string
+          enum: [Meccan, Medinan]
+        versesCount:
+          type: integer
+        pageNumber:
+          type: integer
+        juzNumber:
+          type: integer
+      required:
+        - id
+        - number
+        - name
+        - nameSimple
+        - nameTranslation
+        - revelationType
+        - versesCount
+        - pageNumber
+        - juzNumber
+
+    Verse:
+      type: object
+      properties:
+        id:
+          type: string
+        verseKey:
+          type: string
+          description: e.g. "1:1"
+        verseNumber:
+          type: integer
+        text:
+          type: string
+          description: Arabic Quranic text
+        pageNumber:
+          type: integer
+        juzNumber:
+          type: integer
+        hizbNumber:
+          type: integer
+      required:
+        - id
+        - verseKey
+        - verseNumber
+        - text
+        - pageNumber
+        - juzNumber
+        - hizbNumber
+
+    VersesResponse:
+      type: object
+      properties:
+        verses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Verse"
+        surah:
+          $ref: "#/components/schemas/Surah"
+        totalCount:
+          type: integer
+      required:
+        - verses
+        - surah
+        - totalCount
+
+    TafsirResponse:
+      type: object
+      properties:
+        verseKey:
+          type: string
+        text:
+          type: string
+          description: Tafsir text
+        tafsirName:
+          type: string
+        surahName:
+          type: string
+        verseNumber:
+          type: integer
+        surahNumber:
+          type: integer
+      required:
+        - verseKey
+        - text
+        - tafsirName
+        - surahName
+        - verseNumber
+        - surahNumber
+
+    PageResponse:
+      type: object
+      properties:
+        pageNumber:
+          type: integer
+        verses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Verse"
+        surahsOnPage:
+          type: array
+          items:
+            type: integer
+        imageUrl:
+          type: string
+          nullable: true
+          description: Optional Mushaf page image URL
+      required:
+        - pageNumber
+        - verses
+        - surahsOnPage
+
+    Juz:
+      type: object
+      properties:
+        juzNumber:
+          type: integer
+        verseMapping:
+          type: object
+          description: Map of surah number to verse range string
+        firstVerseId:
+          type: integer
+        lastVerseId:
+          type: integer
+        versesCount:
+          type: integer
+      required:
+        - juzNumber
+        - verseMapping
+        - firstVerseId
+        - lastVerseId
+        - versesCount
+
+    SearchResponse:
+      type: object
+      properties:
+        surahs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Surah"
+        totalCount:
+          type: integer
+      required:
+        - surahs
+        - totalCount
+
+    Bookmark:
+      type: object
+      properties:
+        id:
+          type: integer
+        pageNumber:
+          type: integer
+        surahNumber:
+          type: integer
+        verseNumber:
+          type: integer
+        surahName:
+          type: string
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - pageNumber
+        - surahNumber
+        - verseNumber
+        - surahName
+        - createdAt
+
+    CreateBookmarkBody:
+      type: object
+      properties:
+        pageNumber:
+          type: integer
+        surahNumber:
+          type: integer
+        verseNumber:
+          type: integer
+        surahName:
+          type: string
+        note:
+          type: string
+          nullable: true
+      required:
+        - pageNumber
+        - surahNumber
+        - verseNumber
+        - surahName
+
+    ReadingProgress:
+      type: object
+      properties:
+        id:
+          type: integer
+        lastPageNumber:
+          type: integer
+        lastSurahNumber:
+          type: integer
+        lastVerseNumber:
+          type: integer
+        lastSurahName:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - lastPageNumber
+        - lastSurahNumber
+        - lastVerseNumber
+        - lastSurahName
+        - updatedAt
+
+    UpdateReadingProgressBody:
+      type: object
+      properties:
+        lastPageNumber:
+          type: integer
+        lastSurahNumber:
+          type: integer
+        lastVerseNumber:
+          type: integer
+        lastSurahName:
+          type: string
+      required:
+        - lastPageNumber
+        - lastSurahNumber
+        - lastVerseNumber
+        - lastSurahName
+
+    AppSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+        theme:
+          type: string
+          enum: [light, dark]
+        fontSize:
+          type: integer
+          description: Font size percentage (80-150)
+        showTafsir:
+          type: boolean
+        defaultTafsirId:
+          type: integer
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - theme
+        - fontSize
+        - showTafsir
+        - defaultTafsirId
+        - updatedAt
+
+    UpdateSettingsBody:
+      type: object
+      properties:
+        theme:
+          type: string
+          enum: [light, dark]
+        fontSize:
+          type: integer
+        showTafsir:
+          type: boolean
+        defaultTafsirId:
+          type: integer
+
+    ReadingStats:
+      type: object
+      properties:
+        totalBookmarks:
+          type: integer
+        lastReadPage:
+          type: integer
+        lastReadSurah:
+          type: string
+        completedJuz:
+          type: integer
+        readingStreak:
+          type: integer
+        pagesRead:
+          type: integer
+      required:
+        - totalBookmarks
+        - lastReadPage
+        - lastReadSurah
+        - completedJuz
+        - readingStreak
+        - pagesRead
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+      required:
+        - error
