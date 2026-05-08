@@ -13,6 +13,7 @@ import Bookmarks from "@/pages/Bookmarks";
 import Settings from "@/pages/Settings";
 import About from "@/pages/About";
 import Dhikr from "@/pages/Dhikr";
+import Adhan from "@/pages/Adhan";
 import Navigation from "@/components/Navigation";
 import SplashScreen from "@/components/SplashScreen";
 
@@ -41,6 +42,7 @@ function Router() {
           <Route path="/settings" component={Settings} />
           <Route path="/about" component={About} />
           <Route path="/dhikr" component={Dhikr} />
+          <Route path="/adhan" component={Adhan} />
           <Route component={NotFound} />
         </Switch>
       </main>

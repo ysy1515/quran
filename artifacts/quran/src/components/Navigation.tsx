@@ -5,6 +5,7 @@ const navItems = [
   { href: "/mushaf", label: "المصحف", icon: BookIcon },
   { href: "/surahs", label: "السور", icon: ListIcon },
   { href: "/juz", label: "الأجزاء", icon: LayersIcon },
+  { href: "/adhan", label: "الأذان", icon: AdhanIcon },
   { href: "/dhikr", label: "الأذكار", icon: DhikrIcon },
   { href: "/search", label: "البحث", icon: SearchIcon },
   { href: "/bookmarks", label: "العلامات", icon: BookmarkIcon },
@@ -12,12 +13,12 @@ const navItems = [
   { href: "/about", label: "حول", icon: InfoIcon },
 ];
 
-// Mobile bottom nav — first 5 most-used items
+// Mobile bottom nav — 5 most-used items
 const mobileNav = [
   { href: "/", label: "الرئيسية", icon: HomeIcon },
   { href: "/mushaf", label: "المصحف", icon: BookIcon },
+  { href: "/adhan", label: "الأذان", icon: AdhanIcon },
   { href: "/dhikr", label: "الأذكار", icon: DhikrIcon },
-  { href: "/bookmarks", label: "العلامات", icon: BookmarkIcon },
   { href: "/settings", label: "الإعدادات", icon: SettingsIcon },
 ];
 
@@ -58,6 +59,16 @@ function LayersIcon() {
       <polygon points="12 2 2 7 12 12 22 7 12 2" />
       <polyline points="2 17 12 22 22 17" />
       <polyline points="2 12 12 17 22 12" />
+    </svg>
+  );
+}
+
+function AdhanIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-5 h-5">
+      <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" />
+      <circle cx="12" cy="9" r="2.5" />
+      <path d="M2 20h20" />
     </svg>
   );
 }

@@ -38,7 +38,7 @@ export default function JuzPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground">الجزء {juz.juzNumber}</p>
-                    {firstSurahNum && firstVerseRange && (
+                    {firstSurahNum && firstVerseRange && typeof firstVerseRange === "string" && (
                       <p className="text-xs text-muted-foreground mt-0.5">
                         يبدأ من سورة {firstSurahNum} • آية {firstVerseRange.split("-")[0]}
                       </p>
