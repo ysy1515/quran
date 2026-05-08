@@ -142,7 +142,7 @@ const DEFAULT_PREFS: AdhanPrefs = {
   enabledPrayers: ["fajr", "dhuhr", "asr", "maghrib", "isha"],
   snoozedUntil: null,
   calcMethod: "UmmAlQura",
-  madhab: "Shafi",
+  madhab: "Hanafi",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
