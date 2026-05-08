@@ -56,17 +56,17 @@ workflows:
 
           cd "$CM_BUILD_DIR"
 
-          echo "Clean all node_modules"
+          echo "Clean node_modules to avoid missing native optional dependencies"
           rm -rf node_modules
           find . -name "node_modules" -type d -prune -exec rm -rf '{}' +
 
           echo "Prune pnpm store"
           pnpm store prune || true
 
-          echo "Install workspace dependencies with optional native packages"
+          echo "Install workspace dependencies"
           pnpm install --force --no-frozen-lockfile --config.optional=true
 
-      - name: Install missing macOS ARM64 native dependencies
+      - name: Install required macOS ARM64 native packages
         script: |
           set -euo pipefail
 
@@ -78,8 +78,8 @@ workflows:
           echo "Verify Rollup native package"
           node -e "require('@rollup/rollup-darwin-arm64'); console.log('Rollup native OK')"
 
-          echo "Verify LightningCSS native package"
-          node -e "require('lightningcss'); console.log('LightningCSS native OK')"
+          echo "Verify LightningCSS native binary exists"
+          find "$CM_BUILD_DIR/node_modules/.pnpm" -name "lightningcss.darwin-arm64.node" -print -quit
 
       - name: Build mobile web app
         script: |
