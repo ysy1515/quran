@@ -4,12 +4,13 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m2
 
+    integrations:
+      app_store_connect: Codemagic Quran
+
     environment:
       node: latest
       xcode: latest
       cocoapods: default
-      groups:
-        - apple_credentials
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.yahya.quran
@@ -20,17 +21,21 @@ workflows:
           corepack enable
           corepack prepare pnpm@10.26.1 --activate
 
-      - name: Install dependencies
+      - name: Install dependencies from repository root
         script: |
           pnpm install
 
-      - name: Build mobile web app and sync Capacitor iOS
+      - name: Build mobile web app
         script: |
           cd artifacts/quran
           pnpm build:mobile
+
+      - name: Sync Capacitor iOS
+        script: |
+          cd artifacts/quran
           npx cap sync ios
 
-      - name: Set iOS bundle identifier
+      - name: Apply iOS provisioning profiles
         script: |
           cd artifacts/quran/ios/App
           xcode-project use-profiles
