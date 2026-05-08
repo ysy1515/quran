@@ -1,66 +1,87 @@
 import cron from "node-cron";
 import { sendPushToAll } from "../routes/push.js";
 import { logger } from "./logger.js";
+import { db } from "@workspace/db";
+import { appSettingsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
-// Saudi Arabia time = UTC+3
-// 12:00 PM KSA = 09:00 UTC  → cron: "0 9 * * *"
-// 06:00 PM KSA = 15:00 UTC  → cron: "0 15 * * *"
-// 09:00 PM KSA = 18:00 UTC  → cron: "0 18 * * *"
+// Read current notification times from DB (KSA = UTC+3)
+async function getNotifTimes() {
+  try {
+    const [s] = await db
+      .select()
+      .from(appSettingsTable)
+      .where(eq(appSettingsTable.sessionId, "default"))
+      .limit(1);
+    return {
+      quran1: s?.notifQuran1 ?? "12:00",
+      quran2: s?.notifQuran2 ?? "18:00",
+      dhikr: s?.notifDhikr ?? "21:00",
+    };
+  } catch {
+    return { quran1: "12:00", quran2: "18:00", dhikr: "21:00" };
+  }
+}
 
-const QURAN_REMINDERS = [
-  {
-    cron: "0 9 * * *", // 12:00 PM KSA
-    payload: {
-      title: "📖 حان وقت الورد",
-      body: "لا تنسَ ورد الظهر من القرآن الكريم — خصص 10 دقائق لتلاوة كلام الله",
-      icon: "/icons/icon-192.png",
-      badge: "/icons/badge-72.png",
-      tag: "quran-noon",
-    },
-  },
-  {
-    cron: "0 15 * * *", // 06:00 PM KSA
-    payload: {
-      title: "🌅 ورد المساء",
-      body: "اجعل لك نصيباً من كتاب الله — ورد المساء ينتظرك",
-      icon: "/icons/icon-192.png",
-      badge: "/icons/badge-72.png",
-      tag: "quran-evening",
-    },
-  },
-];
-
-const DHIKR_REMINDER = {
-  cron: "0 18 * * *", // 09:00 PM KSA
-  payload: {
-    title: "📿 أذكار المساء",
-    body: "«مَن قَالَ سُبحانَ اللهِ وبِحَمدِهِ مائةَ مرةٍ حُطَّت عنه خطاياه» — سبّح الآن",
-    icon: "/icons/icon-192.png",
-    badge: "/icons/badge-72.png",
-    tag: "dhikr-night",
-  },
-};
+// Convert KSA time "HH:MM" to UTC "HH:MM" (subtract 3 hours)
+function ksaToUtc(ksaTime: string): { h: number; m: number } {
+  const [hStr, mStr] = ksaTime.split(":");
+  let h = parseInt(hStr, 10) - 3;
+  const m = parseInt(mStr, 10);
+  if (h < 0) h += 24;
+  return { h, m };
+}
 
 export function startScheduler() {
-  for (const reminder of QURAN_REMINDERS) {
-    cron.schedule(reminder.cron, async () => {
-      try {
-        const result = await sendPushToAll("quran", reminder.payload);
-        logger.info({ result, tag: reminder.payload.tag }, "Quran reminder sent");
-      } catch (err) {
-        logger.error(err, "Failed to send Quran reminder");
-      }
-    });
-  }
-
-  cron.schedule(DHIKR_REMINDER.cron, async () => {
+  // Run every minute — check if current UTC time matches any notification time
+  cron.schedule("* * * * *", async () => {
     try {
-      const result = await sendPushToAll("dhikr", DHIKR_REMINDER.payload);
-      logger.info({ result }, "Dhikr reminder sent");
+      const now = new Date();
+      const utcH = now.getUTCHours();
+      const utcM = now.getUTCMinutes();
+
+      const times = await getNotifTimes();
+
+      const quran1 = ksaToUtc(times.quran1);
+      const quran2 = ksaToUtc(times.quran2);
+      const dhikr  = ksaToUtc(times.dhikr);
+
+      if (utcH === quran1.h && utcM === quran1.m) {
+        const result = await sendPushToAll("quran", {
+          title: "📖 حان وقت الورد",
+          body: "لا تنسَ ورد القرآن — خصص 10 دقائق لتلاوة كلام الله",
+          icon: "/icons/icon-192.png",
+          badge: "/icons/badge-72.png",
+          tag: "quran-1",
+        });
+        logger.info({ result, time: times.quran1 }, "Quran reminder 1 sent");
+      }
+
+      if (utcH === quran2.h && utcM === quran2.m) {
+        const result = await sendPushToAll("quran", {
+          title: "🌅 ورد المساء",
+          body: "اجعل لك نصيباً من كتاب الله — ورد المساء ينتظرك",
+          icon: "/icons/icon-192.png",
+          badge: "/icons/badge-72.png",
+          tag: "quran-2",
+        });
+        logger.info({ result, time: times.quran2 }, "Quran reminder 2 sent");
+      }
+
+      if (utcH === dhikr.h && utcM === dhikr.m) {
+        const result = await sendPushToAll("dhikr", {
+          title: "📿 أذكار المساء",
+          body: "«مَن قَالَ سُبحانَ اللهِ وبِحَمدِهِ مائةَ مرةٍ حُطَّت عنه خطاياه» — سبّح الآن",
+          icon: "/icons/icon-192.png",
+          badge: "/icons/badge-72.png",
+          tag: "dhikr",
+        });
+        logger.info({ result, time: times.dhikr }, "Dhikr reminder sent");
+      }
     } catch (err) {
-      logger.error(err, "Failed to send Dhikr reminder");
+      logger.error(err, "Scheduler error");
     }
   });
 
-  logger.info("Push notification scheduler started (KSA: 12PM, 6PM Quran | 9PM Dhikr)");
+  logger.info("Push notification scheduler started (checks every minute, reads times from DB)");
 }

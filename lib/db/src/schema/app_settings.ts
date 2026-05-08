@@ -16,6 +16,9 @@ export const appSettingsTable = pgTable("app_settings", {
   fontSize: integer("font_size").notNull().default(100),
   showTafsir: boolean("show_tafsir").notNull().default(true),
   defaultTafsirId: integer("default_tafsir_id").notNull().default(169),
+  notifQuran1: text("notif_quran1").notNull().default("12:00"),
+  notifQuran2: text("notif_quran2").notNull().default("18:00"),
+  notifDhikr: text("notif_dhikr").notNull().default("21:00"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

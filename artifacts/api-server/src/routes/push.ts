@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import webpush from "web-push";
-import { db, pushSubscriptionsTable } from "@workspace/db";
+import { db, pushSubscriptionsTable, appSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -56,6 +56,49 @@ router.delete("/unsubscribe", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Failed to unsubscribe" });
+  }
+});
+
+// GET /api/push/times
+router.get("/times", async (_req, res): Promise<void> => {
+  try {
+    const [settings] = await db.select().from(appSettingsTable).where(eq(appSettingsTable.sessionId, "default")).limit(1);
+    res.json({
+      notifQuran1: settings?.notifQuran1 ?? "12:00",
+      notifQuran2: settings?.notifQuran2 ?? "18:00",
+      notifDhikr:  settings?.notifDhikr  ?? "21:00",
+    });
+  } catch {
+    res.json({ notifQuran1: "12:00", notifQuran2: "18:00", notifDhikr: "21:00" });
+  }
+});
+
+// PUT /api/push/times
+router.put("/times", async (req, res): Promise<void> => {
+  const { notifQuran1, notifQuran2, notifDhikr } = req.body as { notifQuran1?: string; notifQuran2?: string; notifDhikr?: string };
+  const timeRe = /^\d{2}:\d{2}$/;
+  if ((notifQuran1 && !timeRe.test(notifQuran1)) ||
+      (notifQuran2 && !timeRe.test(notifQuran2)) ||
+      (notifDhikr  && !timeRe.test(notifDhikr))) {
+    res.status(400).json({ error: "Invalid time format. Use HH:MM" });
+    return;
+  }
+  try {
+    const existing = await db.select().from(appSettingsTable).where(eq(appSettingsTable.sessionId, "default")).limit(1);
+    if (existing.length === 0) {
+      await db.insert(appSettingsTable).values({ sessionId: "default", notifQuran1: notifQuran1 ?? "12:00", notifQuran2: notifQuran2 ?? "18:00", notifDhikr: notifDhikr ?? "21:00" });
+    } else {
+      await db.update(appSettingsTable).set({
+        ...(notifQuran1 ? { notifQuran1 } : {}),
+        ...(notifQuran2 ? { notifQuran2 } : {}),
+        ...(notifDhikr  ? { notifDhikr }  : {}),
+        updatedAt: new Date(),
+      }).where(eq(appSettingsTable.sessionId, "default"));
+    }
+    res.json({ ok: true, notifQuran1, notifQuran2, notifDhikr });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Failed to save times" });
   }
 });
 
