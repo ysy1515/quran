@@ -16,45 +16,83 @@ workflows:
         bundle_identifier: com.yahya.quran
 
     scripts:
-      - name: Go to repository root
+      - name: Check repository structure
         script: |
-          cd "$CM_BUILD_DIR"
+          echo "Current directory:"
           pwd
-          ls -la
 
-      - name: Install pnpm
+          echo "CM_BUILD_DIR:"
+          echo "$CM_BUILD_DIR"
+
+          echo "Repository files:"
+          ls -la "$CM_BUILD_DIR"
+
+          echo "Quran app files:"
+          ls -la "$CM_BUILD_DIR/artifacts/quran"
+
+      - name: Install pnpm without Corepack
         script: |
           cd "$CM_BUILD_DIR"
-          corepack enable
-          corepack prepare pnpm@10.26.1 --activate
+
+          echo "Disable Corepack to avoid yarn packageManager conflict"
+          corepack disable || true
+
+          echo "Install pnpm globally using npm"
+          npm install -g pnpm@10.26.1
+
+          echo "pnpm version:"
           pnpm --version
 
       - name: Install dependencies from repository root
         script: |
           cd "$CM_BUILD_DIR"
-          pnpm install
+
+          echo "Installing workspace dependencies using pnpm"
+          pnpm install --frozen-lockfile
 
       - name: Build mobile web app
         script: |
           cd "$CM_BUILD_DIR/artifacts/quran"
+
+          echo "Building mobile web app"
           pnpm build:mobile
+
+          echo "Check mobile build output"
+          ls -la dist
+          ls -la dist/mobile
 
       - name: Sync Capacitor iOS
         script: |
           cd "$CM_BUILD_DIR/artifacts/quran"
+
+          echo "Sync Capacitor iOS"
           npx cap sync ios
 
       - name: Apply iOS provisioning profiles
         script: |
           cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
+
+          echo "Apply provisioning profiles"
           xcode-project use-profiles
 
       - name: Build iOS IPA
         script: |
           cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
-          xcode-project build-ipa \
-            --workspace App.xcworkspace \
-            --scheme App
+
+          echo "Available iOS files:"
+          ls -la
+
+          if [ -d "App.xcworkspace" ]; then
+            echo "Building using App.xcworkspace"
+            xcode-project build-ipa \
+              --workspace App.xcworkspace \
+              --scheme App
+          else
+            echo "App.xcworkspace not found, building using App.xcodeproj"
+            xcode-project build-ipa \
+              --project App.xcodeproj \
+              --scheme App
+          fi
 
     artifacts:
       - artifacts/quran/ios/App/build/ios/ipa/*.ipa
