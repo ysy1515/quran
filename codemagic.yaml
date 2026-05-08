@@ -32,6 +32,9 @@ workflows:
           echo "Quran app files:"
           ls -la "$CM_BUILD_DIR/artifacts/quran"
 
+          echo "Node version:"
+          node --version
+
       - name: Install pnpm without Corepack
         script: |
           set -euo pipefail
@@ -44,9 +47,6 @@ workflows:
           echo "Install pnpm globally using npm"
           npm install -g pnpm@10.26.1
 
-          echo "Node version:"
-          node --version
-
           echo "pnpm version:"
           pnpm --version
 
@@ -56,15 +56,30 @@ workflows:
 
           cd "$CM_BUILD_DIR"
 
-          echo "Remove existing node_modules to avoid missing native optional dependencies"
+          echo "Clean all node_modules"
           rm -rf node_modules
           find . -name "node_modules" -type d -prune -exec rm -rf '{}' +
 
-          echo "Install workspace dependencies with optional dependencies enabled"
-          pnpm install --no-frozen-lockfile --config.optional=true
+          echo "Prune pnpm store"
+          pnpm store prune || true
 
-          echo "Verify Rollup native package for macOS ARM64"
-          pnpm add -w -D @rollup/rollup-darwin-arm64@4.59.0 --config.optional=true
+          echo "Install workspace dependencies with optional native packages"
+          pnpm install --force --no-frozen-lockfile --config.optional=true
+
+      - name: Install missing macOS ARM64 native dependencies
+        script: |
+          set -euo pipefail
+
+          cd "$CM_BUILD_DIR"
+
+          echo "Install Rollup and LightningCSS native packages for macOS ARM64"
+          pnpm add -Dw @rollup/rollup-darwin-arm64@4.59.0 lightningcss-darwin-arm64@1.31.1 --config.optional=true
+
+          echo "Verify Rollup native package"
+          node -e "require('@rollup/rollup-darwin-arm64'); console.log('Rollup native OK')"
+
+          echo "Verify LightningCSS native package"
+          node -e "require('lightningcss'); console.log('LightningCSS native OK')"
 
       - name: Build mobile web app
         script: |
