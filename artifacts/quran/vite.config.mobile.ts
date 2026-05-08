@@ -8,11 +8,18 @@ function renameHtmlPlugin(): Plugin {
   return {
     name: "rename-mobile-html",
     closeBundle() {
-      const from = path.resolve(import.meta.dirname, "dist/mobile/index.mobile.html");
-      const to = path.resolve(import.meta.dirname, "dist/mobile/index.html");
-      if (fs.existsSync(from)) {
-        fs.renameSync(from, to);
-      }
+      const outDir = path.resolve(import.meta.dirname, "dist/mobile");
+
+      // Rename index.mobile.html → index.html (Capacitor requires index.html)
+      const from = path.join(outDir, "index.mobile.html");
+      const to = path.join(outDir, "index.html");
+      if (fs.existsSync(from)) fs.renameSync(from, to);
+
+      // Remove service worker from mobile build.
+      // Capacitor iOS WKWebView has limited SW support and the PWA sw.js
+      // is only for the web version.
+      const sw = path.join(outDir, "sw.js");
+      if (fs.existsSync(sw)) fs.unlinkSync(sw);
     },
   };
 }
@@ -25,7 +32,7 @@ export default defineConfig(({ mode }) => {
   if (!apiBaseUrl) {
     console.warn(
       "\n⚠️  VITE_API_BASE_URL is not set.\n" +
-      "   Set it before building: VITE_API_BASE_URL=https://your-app.replit.app pnpm build:mobile\n" +
+      "   Set it before building: VITE_API_BASE_URL=https://quran.yahya.app pnpm build:mobile\n" +
       "   Or add it to .env.mobile\n"
     );
   } else {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
@@ -50,13 +50,22 @@ function Router() {
   );
 }
 
-function App() {
+interface AppProps {
+  onMounted?: () => void;
+}
+
+function App({ onMounted }: AppProps) {
   const [showSplash, setShowSplash] = useState<boolean>(() => {
     // Show only once per browser session
     if (sessionStorage.getItem("splash-shown")) return false;
     sessionStorage.setItem("splash-shown", "1");
     return true;
   });
+
+  // Hide the HTML loading overlay as soon as React mounts successfully
+  useEffect(() => {
+    onMounted?.();
+  }, [onMounted]);
 
   return (
     <QueryClientProvider client={queryClient}>

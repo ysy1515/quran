@@ -1,0 +1,228 @@
+Act as a senior React/Vite/Capacitor iOS engineer.
+
+Critical issue:
+The iOS TestFlight app opens to a black screen before the latest fixes. This must be diagnosed and fixed before the next Codemagic build.
+
+Project path:
+artifacts/quran
+
+Important constraints:
+- Do not break the working web version.
+- Do not break Capacitor iOS/Android setup.
+- Do not change the database unless absolutely required.
+- Keep Arabic RTL layout.
+- Keep existing Quran, prayer times, adhkar, settings, notifications, and muezzin logic.
+- The app must work in:
+  - Replit web preview
+  - production web
+  - iOS Capacitor/TestFlight
+  - Android Capacitor
+
+==================================================
+ISSUE 0: iOS TestFlight black screen
+==================================================
+
+Current issue:
+When opening the app from TestFlight, it shows a black screen.
+
+Required:
+Find and fix the cause of the black screen in the Capacitor iOS build.
+
+Tasks:
+1. Inspect the Capacitor iOS build configuration:
+   - artifacts/quran/capacitor.config.ts
+   - artifacts/quran/vite.config.mobile.ts
+   - artifacts/quran/src/main.mobile.tsx
+   - artifacts/quran/index.mobile.html or mobile entry files
+   - artifacts/quran/ios/App/App/Info.plist
+   - artifacts/quran/ios/App/App/public
+
+2. Check for common black screen causes:
+   - wrong webDir in capacitor.config.ts
+   - wrong build output folder
+   - index file missing from iOS public folder
+   - Vite base path issue
+   - JS/CSS assets referenced with wrong absolute/relative path
+   - runtime error in main.mobile.tsx
+   - environment variable missing in mobile build
+   - placeholder API URL
+   - Content Security Policy blocking assets
+   - iOS WebView blocking mixed content or non-HTTPS calls
+   - app trying to call localhost or Replit dev URL
+   - missing mobile root element
+   - React app crash before render
+   - dark splash screen not hiding because app never finishes loading
+
+3. Verify the mobile build output:
+   Run:
+   pnpm build:mobile
+
+   Confirm:
+   - dist/mobile/index.html exists OR the correct entry file exists
+   - JS/CSS assets exist under dist/mobile/assets
+   - capacitor.config.ts webDir points to the actual folder, likely:
+     dist/mobile
+   - after npx cap sync ios, files exist in:
+     ios/App/App/public/
+
+4. If capacitor.config.ts currently has wrong webDir, fix it.
+   Example:
+   webDir: "dist/mobile"
+
+5. If Vite mobile build outputs index.mobile.html instead of index.html:
+   Fix the build so Capacitor receives a valid index.html in webDir.
+   Capacitor expects an index.html inside webDir.
+   Either:
+   - configure Vite mobile build to output dist/mobile/index.html
+   OR
+   - copy/rename index.mobile.html to index.html after build
+   Use the cleanest stable solution.
+
+6. Add a safe startup fallback:
+   - Make sure React root renders a visible Arabic loading/error screen instead of black screen.
+   - Add global error handling for mobile startup.
+   - If app initialization fails, show:
+     "حدث خطأ أثناء تشغيل التطبيق"
+     with a retry button.
+   - Log useful errors only in development.
+
+7. Check iOS WebView console/log guidance:
+   Add documentation explaining how to debug with Safari Web Inspector if needed.
+
+==================================================
+ISSUE 1: Wrong muezzin audio / missing adhan files
+==================================================
+
+Current issue:
+Audio preview plays "بسم الله الرحمن الرحيم" or Quran recitation instead of actual adhan, or says:
+"ملف الأذان غير متوفر حالياً"
+
+Required:
+1. Do not use Quran recitation, basmalah, or placeholder audio for adhan previews.
+2. Use only actual adhan MP3 files.
+3. Audio files must be stored under:
+   public/audio/adhan/
+4. If files are missing:
+   - Show:
+     "ملف الأذان غير متوفر حالياً"
+   - Do not play any fallback Quran audio.
+5. Keep only available muezzins enabled, or clearly disable unavailable previews.
+6. Confirm required paths:
+   - dist/mobile/audio/adhan/
+   - ios/App/App/public/audio/adhan/
+   - android/app/src/main/assets/public/audio/adhan/
+
+==================================================
+ISSUE 2: Quran/Mushaf works in browser but fails in TestFlight
+==================================================
+
+Current issue:
+Quran/Mushaf works in browser, but in TestFlight it does not load and shows:
+"تعذر تحميل الآيات، تحقق من اتصالك بالإنترنت"
+
+Required:
+1. Find why Quran/Mushaf fails only in Capacitor iOS/TestFlight.
+2. Check for:
+   - placeholder URL such as https://your-replit-app.replit.app
+   - wrong API base URL
+   - relative paths that fail in Capacitor
+   - missing local Quran assets in dist/mobile or ios/App/App/public
+   - API blocked by iOS because of HTTP or invalid URL
+   - CORS/network issue
+3. Replace placeholder URLs with the real production URL:
+   https://quran.yahya.app
+4. Prefer local bundled Quran data/assets where practical.
+5. If remote API is still used:
+   - Use HTTPS only.
+   - Add timeout and retry.
+   - Show accurate Arabic errors:
+     - API failure: "تعذر الاتصال بمصدر بيانات القرآن"
+     - Missing local files: "ملفات القرآن غير متوفرة حالياً"
+     - Parse failure: "تعذر قراءة بيانات القرآن"
+     - Unknown: "حدث خطأ أثناء تحميل الآيات"
+6. Do not show "تحقق من اتصالك بالإنترنت" unless it is truly a network failure.
+
+==================================================
+ISSUE 3: Notifications show unsupported inside native app
+==================================================
+
+Current issue:
+In settings, notifications show:
+"غير مدعوم في هذا المتصفح"
+even inside the iOS/Android Capacitor app.
+
+Required:
+1. Use Capacitor platform detection:
+   - Capacitor.isNativePlatform()
+   - Capacitor.getPlatform()
+2. In iOS/Android Capacitor:
+   - Do not show browser unsupported message.
+   - Show:
+     "الإشعارات متاحة عبر التطبيق"
+3. Use:
+   - @capacitor/local-notifications for prayer reminders
+   - @capacitor/push-notifications for remote push only if configured
+4. Handle permission states properly:
+   - Allowed: "تم تفعيل الإشعارات"
+   - Denied: "لم يتم السماح بالإشعارات من إعدادات الجهاز"
+   - Not requested: show enable button
+
+==================================================
+Required build verification
+==================================================
+
+After fixes, run from repository root:
+
+pnpm install
+cd artifacts/quran
+pnpm build:mobile
+npx cap sync ios
+npx cap sync android
+
+Then verify:
+1. Mobile build succeeds.
+2. dist/mobile contains a valid index.html.
+3. capacitor.config.ts webDir matches the actual build output.
+4. ios/App/App/public contains index.html, assets, Quran files, and audio folders.
+5. Android public assets are synced.
+6. No placeholder URLs remain:
+   Search for:
+   your-replit-app
+   localhost
+   127.0.0.1
+   http://
+7. App no longer opens to black screen in iOS build.
+8. Quran/Mushaf loads in mobile build.
+9. Adhan previews do not play Quran/basmalah audio.
+10. Notifications do not say unsupported browser inside Capacitor.
+
+==================================================
+Documentation
+==================================================
+
+Update or create:
+MOBILE_DEBUG_AND_RELEASE_NOTES.md
+
+Include:
+- Root cause of iOS black screen
+- Root cause of Mushaf/TestFlight loading issue
+- Root cause of wrong/missing adhan audio
+- Root cause of notification unsupported message
+- Files changed
+- Build commands
+- Required manual upload of real adhan MP3 files if still missing
+- Reminder that after changes we must:
+  git add .
+  git commit
+  git push
+  run a new Codemagic build
+  upload a new TestFlight build
+
+Final response required:
+Provide:
+1. Root cause for black screen.
+2. Exact fix applied.
+3. Whether Replit republish is enough or Codemagic build is required.
+4. Files changed.
+5. Build/test results.
+6. Any manual steps still required.
