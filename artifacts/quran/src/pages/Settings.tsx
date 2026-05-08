@@ -112,8 +112,9 @@ export default function Settings() {
   };
 
   const sl = {
-    unsupported: { text: "غير مدعوم في هذا المتصفح", color: "text-destructive" },
-    denied: { text: "محظور — أعد تشغيل الإذن من إعدادات المتصفح", color: "text-destructive" },
+    unsupported: { text: "الإشعارات غير مدعومة في هذا المتصفح", color: "text-destructive" },
+    native: { text: "الإشعارات متاحة عبر التطبيق", color: "text-primary" },
+    denied: { text: "محظور — أعد تشغيل الإذن من إعدادات الجهاز", color: "text-destructive" },
     default: { text: "غير مفعّل", color: "text-muted-foreground" },
     granted: { text: "الإذن ممنوح — اضغط تفعيل", color: "text-amber-500" },
     subscribed: { text: "مفعّل ✓", color: "text-primary" },
@@ -200,13 +201,24 @@ export default function Settings() {
                 className="text-xs px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50">
                 {push.loading ? "..." : "إيقاف"}
               </button>
-            ) : push.status !== "unsupported" && push.status !== "denied" ? (
+            ) : push.status === "native" ? null
+            : push.status !== "unsupported" && push.status !== "denied" ? (
               <button onClick={handleEnableNotifications} disabled={push.loading}
                 className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
                 {push.loading ? "..." : "تفعيل"}
               </button>
             ) : null}
           </div>
+
+          {/* Native Capacitor — prayer reminders handled in Adhan page */}
+          {push.status === "native" && (
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-sm text-foreground leading-relaxed" dir="rtl">
+              <p className="font-medium mb-1">🕌 تذكيرات الصلاة</p>
+              <p className="text-xs text-muted-foreground">
+                يمكنك تفعيل تنبيهات مواقيت الصلاة من صفحة <strong>الأذان</strong>، وتخصيص الصلوات ووقت التذكير.
+              </p>
+            </div>
+          )}
 
           {/* Preferences when subscribed */}
           {push.status === "subscribed" && (
@@ -235,8 +247,8 @@ export default function Settings() {
             </div>
           )}
 
-          {/* Custom notification times — always visible */}
-          {push.status !== "unsupported" && (
+          {/* Custom notification times — web only */}
+          {push.status !== "unsupported" && push.status !== "native" && (
             <div className={`${push.status === "subscribed" ? "border-t border-border pt-4" : ""}`}>
               <p className="text-xs font-medium text-foreground mb-3">
                 {push.status === "subscribed" ? "تخصيص مواعيد الإشعارات (توقيت السعودية)" : "مواعيد الإشعارات (توقيت السعودية)"}

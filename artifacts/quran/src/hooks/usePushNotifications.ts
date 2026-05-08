@@ -2,6 +2,14 @@ import { useState, useEffect, useCallback } from "react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+function isCapacitorNative(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
+      .Capacitor?.isNativePlatform?.()
+  );
+}
+
 async function getVapidKey(): Promise<string> {
   const res = await fetch(`${API_BASE}/api/push/vapid-public-key`);
   const data = await res.json() as { publicKey: string };
@@ -15,7 +23,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
 
-export type NotificationStatus = "unsupported" | "denied" | "default" | "granted" | "subscribed";
+export type NotificationStatus = "unsupported" | "native" | "denied" | "default" | "granted" | "subscribed";
 
 export interface PushPreferences {
   notifyQuran: boolean;
@@ -28,13 +36,28 @@ export function usePushNotifications() {
   const [prefs, setPrefs] = useState<PushPreferences>({ notifyQuran: true, notifyDhikr: true });
   const [loading, setLoading] = useState(false);
 
+  // On native Capacitor, Web Push API is not applicable — local notifications handle prayer reminders
+  const isNative = isCapacitorNative();
+
   const isSupported =
-    "Notification" in window &&
-    "serviceWorker" in navigator &&
-    "PushManager" in window;
+    isNative ||
+    (
+      typeof window !== "undefined" &&
+      "Notification" in window &&
+      "serviceWorker" in navigator &&
+      "PushManager" in window
+    );
 
   useEffect(() => {
-    if (!isSupported) { setStatus("unsupported"); return; }
+    if (isNative) {
+      setStatus("native");
+      return;
+    }
+
+    if (!isSupported) {
+      setStatus("unsupported");
+      return;
+    }
 
     // Load saved prefs from localStorage
     const saved = localStorage.getItem("push-prefs");
@@ -56,10 +79,10 @@ export function usePushNotifications() {
         }
       });
     });
-  }, [isSupported]);
+  }, [isNative, isSupported]);
 
   const register = useCallback(async (preferences: PushPreferences = prefs) => {
-    if (!isSupported) return;
+    if (isNative || !isSupported) return;
     setLoading(true);
     try {
       // Register service worker
@@ -103,7 +126,7 @@ export function usePushNotifications() {
     } finally {
       setLoading(false);
     }
-  }, [isSupported, prefs]);
+  }, [isNative, isSupported, prefs]);
 
   const unsubscribe = useCallback(async () => {
     if (!subscription) return;
@@ -136,5 +159,5 @@ export function usePushNotifications() {
     });
   }, [subscription]);
 
-  return { status, subscription, prefs, loading, isSupported, register, unsubscribe, updatePreferences };
+  return { status, subscription, prefs, loading, isNative, isSupported, register, unsubscribe, updatePreferences };
 }

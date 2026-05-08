@@ -1,0 +1,330 @@
+Act as a senior full-stack/mobile engineer specialized in React/Vite, Capacitor iOS/Android, offline assets, audio playback, and notifications.
+
+We have three critical issues in the Quran app that must be fixed professionally.
+
+Context:
+The app is a Quran web app wrapped with Capacitor for iOS and Android.
+The project path is:
+artifacts/quran
+
+Important constraints:
+- Do not break the existing Quran, prayer times, adhkar, notification settings, or Capacitor setup.
+- Do not change the database unless absolutely required.
+- Do not remove existing features.
+- Keep Arabic RTL layout.
+- Keep the selected muezzin saving logic.
+- Keep the app working on:
+  - Replit web preview
+  - Production web build
+  - iOS Capacitor app
+  - Android Capacitor app
+- Do not rely on temporary or unstable external URLs.
+- Do not use autoplay for audio.
+
+==================================================
+ISSUE 1: Muezzin audio preview is not working
+==================================================
+
+Current issue:
+When the user taps any muezzin preview/play button, the app shows:
+"ملف الصوت غير متوفر حالياً"
+
+Required:
+Fix the muezzin audio preview so the user can actually listen to the adhan preview for each muezzin.
+
+Tasks:
+1. Inspect the current muezzin list/data source.
+   - Find where each muezzin preview audio URL/path is defined.
+   - Identify why the app currently shows "ملف الصوت غير متوفر حالياً".
+   - Check if the issue is caused by missing files, wrong paths, Vite public asset path, Capacitor path, or unavailable remote URLs.
+
+2. Implement a reliable audio source strategy.
+   Preferred solution:
+   - Use local bundled MP3 files.
+   - Store files under:
+     public/audio/adhan/
+   - Example paths:
+     /audio/adhan/yasser-al-dosari.mp3
+     /audio/adhan/ali-ahmad-mulla.mp3
+     /audio/adhan/abdulbasit-abdul-samad.mp3
+   - Make sure Vite copies these files into the production build.
+   - Make sure Capacitor copies them into iOS/Android during:
+     npx cap sync ios
+     npx cap sync android
+
+3. If actual MP3 files are not available in the repository:
+   - Do not fake success.
+   - Add clear placeholder structure and documentation.
+   - Add a clear TODO list of exact file names required.
+   - Make the app detect missing files correctly.
+   - Do not show false generic errors.
+
+4. Update each muezzin object to include a valid `audioUrl` or `previewUrl`.
+
+Example:
+{
+  id: "yasser_al_dosari",
+  name: "الشيخ ياسر الدوسري",
+  mosque: "المسجد الحرام - مكة المكرمة",
+  audioUrl: "/audio/adhan/yasser-al-dosari.mp3"
+}
+
+5. Fix playback logic:
+   - Audio must play only after the user taps the play button.
+   - Do not attempt autoplay.
+   - Use a stable HTMLAudioElement or React ref-based implementation.
+   - When one muezzin starts playing, stop any currently playing audio.
+   - Show loading state while audio is loading.
+   - Show playing/paused state correctly.
+   - Reset state when audio ends.
+   - Handle errors clearly.
+
+6. Error handling:
+   - If the file is missing, show:
+     "ملف الصوت غير متوفر حالياً"
+   - If the browser/app blocks playback, show:
+     "تعذر تشغيل الصوت، يرجى المحاولة مرة أخرى"
+   - Do not show false errors when the file exists.
+
+7. Verify final paths:
+   - Browser:
+     /audio/adhan/file-name.mp3
+   - Production build:
+     dist/mobile/audio/adhan/
+   - iOS:
+     ios/App/App/public/audio/adhan/
+   - Android:
+     android/app/src/main/assets/public/audio/adhan/
+
+==================================================
+ISSUE 2: Quran/Mushaf/Ayah loading fails
+==================================================
+
+Current issue:
+When the user opens the Quran/Mushaf/pages, the app waits for a while then shows:
+"تعذر تحميل الآيات، تحقق من اتصالك بالإنترنت"
+
+The user is connected to the internet, so this is likely not a real connectivity issue.
+
+Required:
+Fix Quran/Mushaf/Ayah loading so the Quran content opens reliably in the web app and inside iOS/Android Capacitor.
+
+Tasks:
+1. Inspect how Quran data/ayahs/pages are loaded.
+   - Identify whether the app loads Quran data from:
+     - external API
+     - local JSON files
+     - server endpoint
+     - static files
+     - dynamic import
+   - Find the exact reason for failure.
+
+2. Do not show "تحقق من اتصالك بالإنترنت" unless the failure is truly a network failure.
+   Improve error messages:
+   - If API fails:
+     "تعذر الاتصال بمصدر بيانات القرآن"
+   - If local file is missing:
+     "ملفات القرآن غير متوفرة حالياً"
+   - If parsing fails:
+     "تعذر قراءة بيانات القرآن"
+   - If unknown:
+     "حدث خطأ أثناء تحميل الآيات"
+
+3. Make Quran loading reliable for Capacitor:
+   - Avoid depending only on remote API if possible.
+   - Prefer bundling core Quran data locally inside the app.
+   - Store static Quran JSON files under a stable public path such as:
+     public/data/quran/
+   - Example:
+     public/data/quran/surahs.json
+     public/data/quran/ayahs.json
+     public/data/quran/pages.json
+   - Make sure Vite copies them to:
+     dist/mobile/data/quran/
+   - Make sure Capacitor sync copies them to:
+     ios/App/App/public/data/quran/
+     android/app/src/main/assets/public/data/quran/
+
+4. If the current Quran source is an external API:
+   - Add timeout handling.
+   - Add retry handling.
+   - Add fallback to local bundled data if available.
+   - Do not fail silently.
+   - Log useful errors in development only.
+   - Do not expose sensitive keys.
+
+5. If the current Quran source is local files:
+   - Verify paths work under:
+     Replit web
+     Vite production build
+     Capacitor WebView
+   - Fix base path issues.
+   - Avoid relative paths that break inside Capacitor.
+   - Use absolute public paths like:
+     /data/quran/filename.json
+
+6. Add loading-state improvements:
+   - Show a proper Arabic loading message:
+     "جاري تحميل الآيات..."
+   - If loading takes too long, show a retry button:
+     "إعادة المحاولة"
+   - Do not block forever.
+
+7. Test:
+   - Open Mushaf/Quran page in Replit preview.
+   - Run:
+     pnpm build:mobile
+     npx cap sync ios
+     npx cap sync android
+   - Verify Quran files exist in:
+     dist/mobile/data/quran/
+     ios/App/App/public/data/quran/
+     android/app/src/main/assets/public/data/quran/
+   - Verify the Quran page opens without false internet error.
+
+==================================================
+ISSUE 3: Notifications show "unsupported in this browser" inside the mobile app
+==================================================
+
+Current issue:
+In settings, notifications show:
+"غير مدعوم في هذا المتصفح"
+
+But the user is not using a normal browser; the app is running inside the Capacitor mobile app.
+
+Required:
+Fix notification support detection so it correctly handles:
+- Web browser
+- iOS Capacitor app
+- Android Capacitor app
+
+Tasks:
+1. Inspect notification support detection logic.
+   - Find why the app treats the Capacitor app as an unsupported browser.
+   - Do not rely only on:
+     window.Notification
+     serviceWorker
+     PushManager
+   because these are web-only and not suitable for native Capacitor push/local notifications.
+
+2. Use Capacitor platform detection:
+   - Import Capacitor from @capacitor/core.
+   - Use:
+     Capacitor.isNativePlatform()
+     Capacitor.getPlatform()
+   - If native platform is iOS or Android, show native notification controls instead of "غير مدعوم في هذا المتصفح".
+
+3. Implement correct behavior:
+   - On web browser:
+     If browser notifications are unsupported, show:
+     "الإشعارات غير مدعومة في هذا المتصفح"
+   - On iOS/Android Capacitor:
+     Do not show browser unsupported message.
+     Instead show:
+     "الإشعارات متاحة عبر التطبيق"
+     and provide enable/disable controls.
+
+4. Use the correct Capacitor plugins:
+   - @capacitor/local-notifications for scheduled prayer reminders.
+   - @capacitor/push-notifications for remote push if configured.
+
+5. Permission handling:
+   - On iOS/Android:
+     request permissions using Capacitor plugin APIs.
+   - On Android 13+:
+     handle notification runtime permission.
+   - On iOS:
+     request notification authorization properly.
+   - If permission denied, show:
+     "لم يتم السماح بالإشعارات من إعدادات الجهاز"
+   - If allowed, show:
+     "تم تفعيل الإشعارات"
+
+6. Local prayer notifications:
+   - For prayer reminders, use Local Notifications where practical.
+   - Do not depend on server push for daily prayer reminders unless server scheduler exists.
+   - Schedule reminders based on current prayer times and user settings.
+   - Prevent duplicate scheduled notifications.
+
+7. Remote push notifications:
+   - If remote push is not fully configured, do not pretend it works.
+   - Clearly document what remains required:
+     - Firebase for Android if needed
+     - APNs capability/key for iOS
+     - Codemagic signing/capabilities
+     - Backend endpoint for device token registration if needed
+
+8. UI behavior:
+   - In native app:
+     Replace "غير مدعوم في هذا المتصفح" with proper native status.
+   - Keep Arabic labels.
+   - Keep existing notification settings:
+     - تفعيل / إيقاف الإشعارات
+     - الفجر
+     - الظهر
+     - العصر
+     - المغرب
+     - العشاء
+     - التذكير قبل الصلاة
+
+9. Testing:
+   - Test in normal browser.
+   - Test in Capacitor iOS mode if possible.
+   - Test in Capacitor Android mode if possible.
+   - Verify that the unsupported browser message does not appear inside native app.
+   - Verify permission states:
+     allowed
+     denied
+     not requested
+
+==================================================
+Build and verification
+==================================================
+
+After fixes, run from repository root:
+
+pnpm install
+cd artifacts/quran
+pnpm build:mobile
+npx cap sync ios
+npx cap sync android
+
+Verify:
+1. Build succeeds.
+2. Muezzin audio files are copied correctly.
+3. Quran data files are copied correctly.
+4. iOS Capacitor public folder contains audio and Quran assets.
+5. Android Capacitor public folder contains audio and Quran assets.
+6. Notification settings detect native app correctly.
+7. No false "غير مدعوم في هذا المتصفح" inside Capacitor.
+8. No false "تعذر تحميل الآيات، تحقق من اتصالك بالإنترنت" when data is available.
+
+==================================================
+Documentation
+==================================================
+
+Update or create:
+MOBILE_ASSETS_AND_NOTIFICATIONS.md
+
+Document:
+- Where muezzin audio files are stored.
+- Exact MP3 filenames required.
+- Where Quran data files are stored.
+- Whether Quran content is local, remote, or hybrid fallback.
+- How notification detection works on web vs iOS vs Android.
+- Any remaining manual setup required for APNs/Firebase/TestFlight.
+- Testing checklist.
+
+==================================================
+Expected final response
+==================================================
+
+After completion, provide:
+1. Root cause for muezzin audio issue.
+2. Root cause for Quran/Mushaf loading issue.
+3. Root cause for notification unsupported message.
+4. Chosen fix for each issue.
+5. Files changed.
+6. Asset paths added.
+7. Build/test results.
+8. Any remaining manual steps, especially if I need to upload real MP3 files or Quran JSON files.

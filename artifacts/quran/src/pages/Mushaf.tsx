@@ -177,14 +177,26 @@ export default function Mushaf() {
       )}
 
       {isError && (
-        <div className="flex flex-col items-center py-20 text-center gap-3">
+        <div className="flex flex-col items-center py-20 text-center gap-4">
           <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-7 h-7 text-destructive">
               <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
           </div>
-          <p className="font-medium text-foreground">تعذّر تحميل الآيات</p>
-          <p className="text-sm text-muted-foreground">تحقق من اتصالك بالإنترنت</p>
+          <div>
+            <p className="font-medium text-foreground mb-1">تعذّر تحميل الآيات</p>
+            <p className="text-sm text-muted-foreground">
+              {navigator.onLine
+                ? "تعذّر الاتصال بمصدر بيانات القرآن"
+                : "تحقق من اتصالك بالإنترنت"}
+            </p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            إعادة المحاولة
+          </button>
         </div>
       )}
 

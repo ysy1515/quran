@@ -13,13 +13,20 @@ import { and, eq } from "drizzle-orm";
 const QURAN_API_BASE =
   process.env.QURAN_API_BASE ?? "https://api.quran.com/api/v4";
 const TAFSIR_ID_DEFAULT = 14; // Ibn Kathir Arabic (14 = Arabic, 169 = English abridged)
+const FETCH_TIMEOUT_MS = 12000; // 12 seconds
+
+function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
 
 const router: IRouter = Router();
 
 // List all 114 surahs
 router.get("/surahs", async (req, res): Promise<void> => {
   try {
-    const resp = await fetch(`${QURAN_API_BASE}/chapters?language=ar`, {
+    const resp = await fetchWithTimeout(`${QURAN_API_BASE}/chapters?language=ar`, {
       headers: { Accept: "application/json" },
     });
     if (!resp.ok) {
@@ -74,11 +81,11 @@ router.get("/surahs/:number/verses", async (req, res): Promise<void> => {
 
   try {
     const [versesResp, chapterResp] = await Promise.all([
-      fetch(
+      fetchWithTimeout(
         `${QURAN_API_BASE}/verses/by_chapter/${params.data.number}?language=ar&words=false&page=${page}&per_page=${perPage}&fields=text_uthmani,page_number,juz_number,hizb_number&translations=20`,
         { headers: { Accept: "application/json" } }
       ),
-      fetch(
+      fetchWithTimeout(
         `${QURAN_API_BASE}/chapters/${params.data.number}?language=ar`,
         { headers: { Accept: "application/json" } }
       ),
@@ -202,11 +209,11 @@ router.get(
     // Fetch from Quran.com API
     try {
       const [tafsirResp, verseResp] = await Promise.all([
-        fetch(
+        fetchWithTimeout(
           `${QURAN_API_BASE}/tafsirs/${tafsirId}/by_ayah/${verseKey}`,
           { headers: { Accept: "application/json" } }
         ),
-        fetch(
+        fetchWithTimeout(
           `${QURAN_API_BASE}/verses/by_key/${verseKey}?language=ar&fields=text_uthmani`,
           { headers: { Accept: "application/json" } }
         ),
@@ -269,7 +276,7 @@ router.get("/pages/:pageNumber", async (req, res): Promise<void> => {
   }
 
   try {
-    const resp = await fetch(
+    const resp = await fetchWithTimeout(
       `${QURAN_API_BASE}/verses/by_page/${params.data.pageNumber}?language=ar&words=false&fields=text_uthmani,page_number,juz_number,hizb_number`,
       { headers: { Accept: "application/json" } }
     );
@@ -322,7 +329,7 @@ router.get("/pages/:pageNumber", async (req, res): Promise<void> => {
 // List all juz
 router.get("/juz", async (req, res): Promise<void> => {
   try {
-    const resp = await fetch(`${QURAN_API_BASE}/juzs`, {
+    const resp = await fetchWithTimeout(`${QURAN_API_BASE}/juzs`, {
       headers: { Accept: "application/json" },
     });
 
@@ -366,7 +373,7 @@ router.get("/search", async (req, res): Promise<void> => {
   }
 
   try {
-    const resp = await fetch(`${QURAN_API_BASE}/chapters?language=ar`, {
+    const resp = await fetchWithTimeout(`${QURAN_API_BASE}/chapters?language=ar`, {
       headers: { Accept: "application/json" },
     });
 
