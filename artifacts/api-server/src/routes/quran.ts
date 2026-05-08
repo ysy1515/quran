@@ -12,7 +12,7 @@ import { and, eq } from "drizzle-orm";
 
 const QURAN_API_BASE =
   process.env.QURAN_API_BASE ?? "https://api.quran.com/api/v4";
-const TAFSIR_ID_DEFAULT = 169; // Ibn Kathir Arabic
+const TAFSIR_ID_DEFAULT = 14; // Ibn Kathir Arabic (14 = Arabic, 169 = English abridged)
 
 const router: IRouter = Router();
 
