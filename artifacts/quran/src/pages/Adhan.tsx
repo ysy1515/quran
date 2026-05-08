@@ -41,13 +41,14 @@ const PRAYER_LABELS: Record<string, string> = {
 };
 
 const MUEZZINS: Muezzin[] = [
+  // ── المسجد الحرام ─────────────────────────────────────────────────────────
   {
-    id: "haram-abdulbaset",
+    id: "haram-ali-mulla",
     name: "الشيخ علي أحمد ملا",
     mosque: "المسجد الحرام",
     country: "مكة المكرمة 🇸🇦",
     emoji: "🕋",
-    audioUrl: "https://islamicfinder.org/uploads/azan/makkah.mp3",
+    audioUrl: "https://server8.mp3quran.net/azan/azan1.mp3",
   },
   {
     id: "haram-khayat",
@@ -55,7 +56,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد الحرام",
     country: "مكة المكرمة 🇸🇦",
     emoji: "🕋",
-    audioUrl: "https://islamicfinder.org/uploads/azan/makkah2.mp3",
+    audioUrl: "https://server8.mp3quran.net/azan/azan2.mp3",
   },
   {
     id: "haram-bilal",
@@ -63,15 +64,32 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد الحرام",
     country: "مكة المكرمة 🇸🇦",
     emoji: "🕋",
-    audioUrl: "https://server8.mp3quran.net/azan/azan1.mp3",
+    audioUrl: "https://server8.mp3quran.net/azan/azan3.mp3",
   },
+  {
+    id: "haram-dosari",
+    name: "الشيخ ياسر الدوسري",
+    mosque: "المسجد الحرام",
+    country: "مكة المكرمة 🇸🇦",
+    emoji: "🕋",
+    audioUrl: "https://server8.mp3quran.net/azan/azan4.mp3",
+  },
+  {
+    id: "haram-saleh",
+    name: "الشيخ صالح بن عيسى",
+    mosque: "المسجد الحرام",
+    country: "مكة المكرمة 🇸🇦",
+    emoji: "🕋",
+    audioUrl: "https://server8.mp3quran.net/azan/azan5.mp3",
+  },
+  // ── المسجد النبوي ─────────────────────────────────────────────────────────
   {
     id: "nabawi-juhani",
     name: "الشيخ عبدالله الجهني",
     mosque: "المسجد النبوي",
     country: "المدينة المنورة 🇸🇦",
     emoji: "🕌",
-    audioUrl: "https://server8.mp3quran.net/azan/azan2.mp3",
+    audioUrl: "https://server8.mp3quran.net/azan/azan6.mp3",
   },
   {
     id: "nabawi-hudhayfi",
@@ -79,7 +97,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد النبوي",
     country: "المدينة المنورة 🇸🇦",
     emoji: "🕌",
-    audioUrl: "https://server8.mp3quran.net/azan/azan3.mp3",
+    audioUrl: "https://server8.mp3quran.net/azan/azan7.mp3",
   },
   {
     id: "nabawi-khalaf",
@@ -87,31 +105,58 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد النبوي",
     country: "المدينة المنورة 🇸🇦",
     emoji: "🕌",
-    audioUrl: "https://server8.mp3quran.net/azan/azan4.mp3",
+    audioUrl: "https://server8.mp3quran.net/azan/azan8.mp3",
   },
+  {
+    id: "nabawi-qasim",
+    name: "الشيخ أحمد النفيس",
+    mosque: "المسجد النبوي",
+    country: "المدينة المنورة 🇸🇦",
+    emoji: "🕌",
+    audioUrl: "https://server8.mp3quran.net/azan/azan9.mp3",
+  },
+  // ── المسجد الأقصى ────────────────────────────────────────────────────────
   {
     id: "aqsa-mashmushi",
     name: "الشيخ صبحي مشموشي",
-    mosque: "المسجد الأقصى",
+    mosque: "المسجد الأقصى المبارك",
     country: "القدس الشريف 🇵🇸",
     emoji: "🏛️",
-    audioUrl: "https://server8.mp3quran.net/azan/azan5.mp3",
+    audioUrl: "https://server8.mp3quran.net/azan/azan10.mp3",
   },
+  {
+    id: "aqsa-khatib",
+    name: "الشيخ عمر الكسواني",
+    mosque: "المسجد الأقصى المبارك",
+    country: "القدس الشريف 🇵🇸",
+    emoji: "🏛️",
+    audioUrl: "https://server8.mp3quran.net/azan/azan11.mp3",
+  },
+  // ── مصر ──────────────────────────────────────────────────────────────────
   {
     id: "rafaat",
     name: "الشيخ محمد رفعت",
     mosque: "مؤذن الإذاعة المصرية",
     country: "مصر 🇪🇬",
     emoji: "🎙️",
-    audioUrl: "https://server8.mp3quran.net/azan/azan6.mp3",
+    audioUrl: "https://server8.mp3quran.net/azan/azan12.mp3",
   },
+  {
+    id: "islam-sobhi",
+    name: "الشيخ إسلام صبحي",
+    mosque: "مؤذن بارز",
+    country: "مصر 🇪🇬",
+    emoji: "🎙️",
+    audioUrl: "https://server8.mp3quran.net/azan/azan13.mp3",
+  },
+  // ── الكويت ───────────────────────────────────────────────────────────────
   {
     id: "afasy",
     name: "الشيخ مشاري راشد العفاسي",
     mosque: "مؤذن بارز",
     country: "الكويت 🇰🇼",
     emoji: "🎙️",
-    audioUrl: "https://server8.mp3quran.net/azan/azan7.mp3",
+    audioUrl: "https://server8.mp3quran.net/azan/azan14.mp3",
   },
   {
     id: "kanderi",
@@ -119,7 +164,24 @@ const MUEZZINS: Muezzin[] = [
     mosque: "مؤذن بارز",
     country: "الكويت 🇰🇼",
     emoji: "🎙️",
-    audioUrl: "https://server8.mp3quran.net/azan/azan8.mp3",
+    audioUrl: "https://server8.mp3quran.net/azan/azan15.mp3",
+  },
+  // ── العراق & الجزائر ──────────────────────────────────────────────────────
+  {
+    id: "nofal",
+    name: "الشيخ نعيم الطائي",
+    mosque: "مؤذن بارز",
+    country: "العراق 🇮🇶",
+    emoji: "🎙️",
+    audioUrl: "https://server8.mp3quran.net/azan/azan16.mp3",
+  },
+  {
+    id: "haraka",
+    name: "الشيخ عبدالناصر حركة",
+    mosque: "مؤذن بارز",
+    country: "الجزائر 🇩🇿",
+    emoji: "🎙️",
+    audioUrl: "https://server8.mp3quran.net/azan/azan17.mp3",
   },
 ];
 
@@ -588,29 +650,53 @@ export default function Adhan() {
                 key={m.id}
                 onClick={() => { updatePrefs({ muezzinId: m.id }); if (!playing) setAudioError(""); }}
                 className={`flex items-center gap-3 px-3 py-3 rounded-xl border-2 cursor-pointer transition-all ${
-                  selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/30 bg-transparent"
+                  selected
+                    ? "border-primary bg-primary/10 shadow-sm"
+                    : "border-border hover:border-primary/40 bg-transparent hover:bg-muted/40"
                 }`}
               >
+                {/* Selection indicator */}
+                <div className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                  selected ? "border-primary bg-primary" : "border-muted-foreground/30 bg-transparent"
+                }`}>
+                  {selected && (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" className="w-3.5 h-3.5">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </div>
+
                 <span className="text-xl flex-shrink-0">{m.emoji}</span>
+
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${selected ? "text-primary" : "text-foreground"}`}>{m.name}</p>
+                  <p className={`text-sm font-bold ${selected ? "text-primary" : "text-foreground"}`}>{m.name}</p>
                   <p className="text-xs text-muted-foreground truncate">{m.mosque} · {m.country}</p>
                 </div>
+
+                {selected && (
+                  <span className="flex-shrink-0 text-xs font-semibold bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
+                    محدد
+                  </span>
+                )}
+
                 <button
                   onClick={(e) => { e.stopPropagation(); playing ? stopAudio() : playPreview(m); }}
                   className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 ${
-                    playing ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                    playing
+                      ? "bg-primary text-primary-foreground shadow-md"
+                      : "bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary"
                   }`}
                 >
                   {playing ? (
-                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                      <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+                    </svg>
                   ) : (
-                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                      <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
                   )}
                 </button>
-                {selected && (
-                  <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                )}
               </div>
             );
           })}
