@@ -5,6 +5,7 @@ import bookmarksRouter from "./bookmarks";
 import progressRouter from "./progress";
 import settingsRouter from "./settings";
 import pushRouter from "./push";
+import notificationsRouter from "./notifications";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(bookmarksRouter);
 router.use(progressRouter);
 router.use(settingsRouter);
 router.use("/push", pushRouter);
+router.use("/notifications", notificationsRouter);
 
 export default router;

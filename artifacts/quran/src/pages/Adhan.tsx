@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import * as adhan from "adhan";
 import { toast } from "sonner";
+import { useLocalNotifications } from "@/hooks/useLocalNotifications";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,9 +25,10 @@ interface AdhanPrefs {
   enabled: boolean;
   muezzinId: string;
   enabledPrayers: string[];
-  snoozedUntil: number | null; // timestamp ms, null = not snoozed
+  snoozedUntil: number | null;
   calcMethod: string;
   madhab: string;
+  reminderMinutes: number;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -200,11 +202,12 @@ const CALC_METHODS: { id: string; label: string }[] = [
 
 const DEFAULT_PREFS: AdhanPrefs = {
   enabled: false,
-  muezzinId: "haram-abdulbaset",
+  muezzinId: "haram-ali-mulla",
   enabledPrayers: ["fajr", "dhuhr", "asr", "maghrib", "isha"],
   snoozedUntil: null,
   calcMethod: "UmmAlQura",
   madhab: "Hanafi",
+  reminderMinutes: 0,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -267,6 +270,13 @@ export default function Adhan() {
   const [showSnoozeMenu, setShowSnoozeMenu] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const {
+    permission: localNotifPermission,
+    requestPermission: requestLocalPermission,
+    schedulePrayers,
+    cancelAllPrayer,
+  } = useLocalNotifications();
 
   // ── Persist prefs ────────────────────────────────────────────────────────
   const updatePrefs = useCallback((patch: Partial<AdhanPrefs>) => {
@@ -406,14 +416,14 @@ export default function Adhan() {
     audio.onended = () => setPlayingId(null);
     audio.onerror = () => {
       setPlayingId(null);
-      setAudioError(`تعذّر تشغيل صوت ${muezzin.name}`);
+      setAudioError("ملف الصوت غير متوفر حالياً");
     };
     audio
       .play()
       .then(() => setPlayingId(muezzin.id))
       .catch(() => {
         setPlayingId(null);
-        setAudioError("تعذّر تشغيل الصوت — تأكد من إعدادات الصوت في المتصفح");
+        setAudioError("ملف الصوت غير متوفر حالياً");
       });
   };
 
@@ -427,14 +437,27 @@ export default function Adhan() {
 
   useEffect(() => () => stopAudio(), []);
 
+  // ── Schedule local notifications when prefs/coords change ───────────────
+  useEffect(() => {
+    schedulePrayers(coords, prefs);
+  }, [coords, prefs, schedulePrayers]);
+
   // ── Enable adhan + request permission ───────────────────────────────────
   const handleEnable = async () => {
     if (!coords) { requestLocation(); return; }
-    if ("Notification" in window && Notification.permission === "default") {
-      await Notification.requestPermission();
+    const granted = await requestLocalPermission();
+    if (!granted) {
+      toast.error("لم يتم منح إذن الإشعارات — يرجى السماح من إعدادات الجهاز");
+      return;
     }
     updatePrefs({ enabled: true, snoozedUntil: null });
-    toast.success("تم تفعيل الأذان ✓");
+    toast.success("تم تفعيل تذكيرات الصلاة ✓");
+  };
+
+  const handleDisable = async () => {
+    updatePrefs({ enabled: false });
+    await cancelAllPrayer();
+    toast("تم إيقاف تذكيرات الصلاة");
   };
 
   // ── Snooze ────────────────────────────────────────────────────────────────
@@ -601,9 +624,14 @@ export default function Adhan() {
               استئناف
             </button>
           ) : (
-            <button onClick={() => setShowSnoozeMenu((v) => !v)} className="px-4 py-2 rounded-xl bg-muted text-muted-foreground text-sm font-medium hover:bg-border transition-colors">
-              إيقاف مؤقت
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowSnoozeMenu((v) => !v)} className="px-3 py-2 rounded-xl bg-muted text-muted-foreground text-xs font-medium hover:bg-border transition-colors">
+                إيقاف مؤقت
+              </button>
+              <button onClick={handleDisable} className="px-3 py-2 rounded-xl bg-destructive/10 text-destructive text-xs font-medium hover:bg-destructive/20 transition-colors">
+                إيقاف
+              </button>
+            </div>
           )}
         </div>
 
@@ -629,6 +657,44 @@ export default function Adhan() {
           </div>
         )}
       </div>
+
+      {/* ── Reminder minutes ───────────────────────────────────────────────── */}
+      {prefs.enabled && (
+        <div className="bg-card border border-border rounded-xl p-4 mb-4">
+          <h2 className="font-medium text-foreground mb-3 flex items-center gap-2">
+            <span>⏰</span> وقت التذكير
+          </h2>
+          <p className="text-xs text-muted-foreground mb-3">
+            أرسل التنبيه قبل وقت الصلاة بـ:
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {([0, 5, 10, 15] as const).map((min) => (
+              <button
+                key={min}
+                onClick={() => updatePrefs({ reminderMinutes: min })}
+                className={`flex-1 min-w-0 py-2.5 rounded-xl text-sm font-bold transition-all border-2 ${
+                  prefs.reminderMinutes === min
+                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "border-border bg-muted text-muted-foreground hover:border-primary/40"
+                }`}
+              >
+                {min === 0 ? "عند الأذان" : `${min} دقيقة`}
+              </button>
+            ))}
+          </div>
+          {localNotifPermission === "denied" && (
+            <p className="text-xs text-destructive mt-3 flex items-center gap-1">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5 flex-shrink-0">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              تم رفض إذن الإشعارات — افتح إعدادات الجهاز وأعد السماح
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
+            ملاحظة: قد يختلف صوت الإشعار الكامل حسب قيود iOS وAndroid — الصوت الافتراضي للجهاز هو الأكثر موثوقية
+          </p>
+        </div>
+      )}
 
       {/* ── Muezzin Selection ──────────────────────────────────────────────── */}
       <div className="bg-card border border-border rounded-xl p-4 mb-4">

@@ -16,6 +16,14 @@ const config: CapacitorConfig = {
       iosSpinnerStyle: "small",
       spinnerColor: "#a3e4c1",
     },
+    LocalNotifications: {
+      smallIcon: "ic_stat_icon_config_sample",
+      iconColor: "#1a4731",
+      sound: "default",
+    },
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"],
+    },
   },
   android: {
     backgroundColor: "#1a4731",
