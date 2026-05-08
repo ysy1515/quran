@@ -1,0 +1,65 @@
+Act as a senior Capacitor iOS/Android engineer.
+
+The app icon still did not change in TestFlight even after uploading the icon source file.
+
+Current source icon path:
+artifacts/quran/mobile-assets/icon/icon.png
+
+Problem:
+The TestFlight build still shows the old/default icon, which means the source icon was not properly generated into iOS AppIcon assets or the generated files were not committed.
+
+Required:
+Apply the uploaded icon properly to both iOS and Android.
+
+Important:
+- Do not change app logic.
+- Do not change bundle ID.
+- Do not break Capacitor.
+- Keep bundle ID: com.yahya.quran
+- Keep app name as currently configured.
+
+Tasks:
+1. Verify the source icon exists:
+   artifacts/quran/mobile-assets/icon/icon.png
+
+2. Validate it:
+   - PNG
+   - 1024x1024
+   - square
+   - opaque background if possible
+
+3. Generate iOS and Android app icons from this file.
+   Use the existing project setup if available.
+   If no generator is configured, install/use @capacitor/assets.
+
+4. Make sure generated iOS icons are actually written to:
+   artifacts/quran/ios/App/App/Assets.xcassets/AppIcon.appiconset/
+
+5. Make sure generated Android icons are written to:
+   artifacts/quran/android/app/src/main/res/mipmap-*/
+
+6. Inspect:
+   artifacts/quran/ios/App/App/Assets.xcassets/AppIcon.appiconset/Contents.json
+
+   Confirm it references the newly generated icon files, not the old/default icon.
+
+7. Remove old/default icon assets if they are still being used.
+
+8. Run:
+   cd artifacts/quran
+   pnpm build:mobile
+   npx cap sync ios
+   npx cap sync android
+
+9. Confirm the generated icon files are changed in git:
+   git status
+
+10. Provide:
+   - exact commands used
+   - files changed
+   - confirmation that iOS AppIcon.appiconset was updated
+   - confirmation that Android mipmap icons were updated
+   - whether a new Codemagic build is required
+
+Expected result:
+The next TestFlight build must show the new Quran app icon, not the old/default icon.
