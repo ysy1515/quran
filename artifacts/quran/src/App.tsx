@@ -11,6 +11,7 @@ import Search from "@/pages/Search";
 import Bookmarks from "@/pages/Bookmarks";
 import Settings from "@/pages/Settings";
 import About from "@/pages/About";
+import Dhikr from "@/pages/Dhikr";
 import Navigation from "@/components/Navigation";
 
 const queryClient = new QueryClient({
@@ -37,6 +38,7 @@ function Router() {
           <Route path="/bookmarks" component={Bookmarks} />
           <Route path="/settings" component={Settings} />
           <Route path="/about" component={About} />
+          <Route path="/dhikr" component={Dhikr} />
           <Route component={NotFound} />
         </Switch>
       </main>

@@ -5,10 +5,20 @@ const navItems = [
   { href: "/mushaf", label: "المصحف", icon: BookIcon },
   { href: "/surahs", label: "السور", icon: ListIcon },
   { href: "/juz", label: "الأجزاء", icon: LayersIcon },
+  { href: "/dhikr", label: "الأذكار", icon: DhikrIcon },
   { href: "/search", label: "البحث", icon: SearchIcon },
   { href: "/bookmarks", label: "العلامات", icon: BookmarkIcon },
   { href: "/settings", label: "الإعدادات", icon: SettingsIcon },
   { href: "/about", label: "حول", icon: InfoIcon },
+];
+
+// Mobile bottom nav — first 5 most-used items
+const mobileNav = [
+  { href: "/", label: "الرئيسية", icon: HomeIcon },
+  { href: "/mushaf", label: "المصحف", icon: BookIcon },
+  { href: "/dhikr", label: "الأذكار", icon: DhikrIcon },
+  { href: "/bookmarks", label: "العلامات", icon: BookmarkIcon },
+  { href: "/settings", label: "الإعدادات", icon: SettingsIcon },
 ];
 
 function HomeIcon() {
@@ -48,6 +58,16 @@ function LayersIcon() {
       <polygon points="12 2 2 7 12 12 22 7 12 2" />
       <polyline points="2 17 12 22 22 17" />
       <polyline points="2 12 12 17 22 12" />
+    </svg>
+  );
+}
+
+function DhikrIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-5 h-5">
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2" />
     </svg>
   );
 }
@@ -100,18 +120,16 @@ export default function Navigation() {
     <>
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex fixed top-0 right-0 h-full w-64 bg-card border-l border-border flex-col z-40">
-        {/* Logo */}
         <div className="px-6 py-8 border-b border-border">
           <div className="text-center">
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-primary/10 flex items-center justify-center">
               <span className="text-primary text-xl font-quran">ق</span>
             </div>
             <h1 className="font-quran text-xl text-foreground font-bold">القرآن الكريم</h1>
-            <p className="text-xs text-muted-foreground mt-1">تلاوة وتفسير</p>
+            <p className="text-xs text-muted-foreground mt-1">تلاوة وتفسير وذكر</p>
           </div>
         </div>
 
-        {/* Nav Links */}
         <nav className="flex-1 overflow-y-auto py-4 px-3">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -133,7 +151,6 @@ export default function Navigation() {
           })}
         </nav>
 
-        {/* Footer */}
         <div className="px-6 py-4 border-t border-border">
           <p className="text-xs text-muted-foreground text-center">
             مصدر البيانات: Quran.com API
@@ -143,15 +160,15 @@ export default function Navigation() {
 
       {/* Mobile Bottom Nav */}
       <nav className="md:hidden fixed bottom-0 right-0 left-0 bg-card border-t border-border z-40">
-        <div className="flex items-center justify-around px-2 py-2">
-          {navItems.slice(0, 5).map((item) => {
+        <div className="flex items-center justify-around px-1 py-2">
+          {mobileNav.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all duration-200 min-w-[48px] ${
+                className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all duration-200 min-w-[52px] ${
                   active ? "text-primary" : "text-muted-foreground"
                 }`}
               >
@@ -160,15 +177,6 @@ export default function Navigation() {
               </Link>
             );
           })}
-          <Link
-            href="/settings"
-            className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all duration-200 min-w-[48px] ${
-              isActive("/settings") ? "text-primary" : "text-muted-foreground"
-            }`}
-          >
-            <SettingsIcon />
-            <span className="text-[10px] font-medium">الإعدادات</span>
-          </Link>
         </div>
       </nav>
     </>
