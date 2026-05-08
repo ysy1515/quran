@@ -118,12 +118,12 @@ workflows:
 
           cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
 
-          APP_VERSION="1.0.3"
+          APP_VERSION="1.0.4"
 
-          RAW_BUILD_NUMBER="${CM_BUILD_NUMBER:-11}"
+          RAW_BUILD_NUMBER="${CM_BUILD_NUMBER:-12}"
 
-          if [ "$RAW_BUILD_NUMBER" -lt 10 ]; then
-            BUILD_NUMBER="11"
+          if [ "$RAW_BUILD_NUMBER" -lt 12 ]; then
+            BUILD_NUMBER="12"
           else
             BUILD_NUMBER="$RAW_BUILD_NUMBER"
           fi
