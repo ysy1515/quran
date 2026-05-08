@@ -1,0 +1,54 @@
+workflows:
+  ios-testflight:
+    name: iOS TestFlight Build
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    environment:
+      node: latest
+      xcode: latest
+      cocoapods: default
+      groups:
+        - apple_credentials
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.yahya.quran
+
+    scripts:
+      - name: Install pnpm
+        script: |
+          corepack enable
+          corepack prepare pnpm@10.26.1 --activate
+
+      - name: Install dependencies
+        script: |
+          pnpm install
+
+      - name: Build mobile web app and sync Capacitor iOS
+        script: |
+          cd artifacts/quran
+          pnpm build:mobile
+          npx cap sync ios
+
+      - name: Set iOS bundle identifier
+        script: |
+          cd artifacts/quran/ios/App
+          xcode-project use-profiles
+
+      - name: Build iOS IPA
+        script: |
+          cd artifacts/quran/ios/App
+          xcode-project build-ipa \
+            --workspace App.xcworkspace \
+            --scheme App
+
+    artifacts:
+      - artifacts/quran/ios/App/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - artifacts/quran/ios/App/DerivedData/**/Build/**/*.app
+      - artifacts/quran/ios/App/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
