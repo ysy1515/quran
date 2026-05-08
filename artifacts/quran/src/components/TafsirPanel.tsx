@@ -10,14 +10,16 @@ interface TafsirPanelProps {
   surahName: string;
   verseText: string;
   translationText?: string | null;
+  isBookmarked?: boolean;
+  onBookmark?: () => void;
 }
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
 }
 
-const TAFSIR_AR = 14;   // تفسير ابن كثير — العربي الأصلي
-const TAFSIR_EN = 169;  // Ibn Kathir (Abridged) — English
+const TAFSIR_AR = 14;
+const TAFSIR_EN = 169;
 
 export default function TafsirPanel({
   open,
@@ -27,6 +29,8 @@ export default function TafsirPanel({
   surahName,
   verseText,
   translationText,
+  isBookmarked = false,
+  onBookmark,
 }: TafsirPanelProps) {
   const [lang, setLang] = useState<"ar" | "en">("ar");
 
@@ -65,44 +69,47 @@ export default function TafsirPanel({
                 <div className="flex items-center bg-muted rounded-lg p-0.5 text-xs font-bold">
                   <button
                     onClick={() => setLang("ar")}
-                    className={`px-2.5 py-1 rounded-md transition-all ${
-                      lang === "ar"
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    عربي
-                  </button>
+                    className={`px-2.5 py-1 rounded-md transition-all ${lang === "ar" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  >عربي</button>
                   <button
                     onClick={() => setLang("en")}
-                    className={`px-2.5 py-1 rounded-md transition-all ${
-                      lang === "en"
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    EN
-                  </button>
+                    className={`px-2.5 py-1 rounded-md transition-all ${lang === "en" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  >EN</button>
                 </div>
 
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  lang === "ar"
-                    ? "bg-primary/10 text-primary"
-                    : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                }`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${lang === "ar" ? "bg-primary/10 text-primary" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"}`}>
                   {lang === "ar" ? "ابن كثير" : "Ibn Kathir"}
                 </span>
               </div>
 
-              <button
-                onClick={onClose}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Bookmark button */}
+                {onBookmark && (
+                  <button
+                    onClick={onBookmark}
+                    title={isBookmarked ? "إزالة العلامة" : "ضع علامة على هذه الآية"}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                      isBookmarked
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                    }`}
+                  >
+                    <svg viewBox="0 0 24 24" fill={isBookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.75" className="w-4 h-4">
+                      <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
+                    </svg>
+                  </button>
+                )}
+
+                {/* Close button */}
+                <button
+                  onClick={onClose}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Verse reference */}
@@ -110,22 +117,19 @@ export default function TafsirPanel({
               <span className="font-medium text-foreground">{surahName}</span>
               <span>•</span>
               <span>الآية {verseNumber}</span>
+              {isBookmarked && (
+                <span className="text-primary text-xs bg-primary/10 px-2 py-0.5 rounded-full">مُعلَّمة ✓</span>
+              )}
             </div>
 
             {/* Verse texts */}
             <div className="mt-3 space-y-2">
-              {/* Arabic text */}
               <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
-                <p className="font-quran text-lg text-foreground leading-loose text-right" dir="rtl">
-                  {verseText}
-                </p>
+                <p className="font-quran text-lg text-foreground leading-loose text-right" dir="rtl">{verseText}</p>
               </div>
-              {/* English translation */}
               {translationText && (
                 <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100 dark:border-blue-900/50">
-                  <p className="text-sm text-foreground leading-relaxed" dir="ltr" style={{ textAlign: "left" }}>
-                    {translationText}
-                  </p>
+                  <p className="text-sm text-foreground leading-relaxed" dir="ltr" style={{ textAlign: "left" }}>{translationText}</p>
                 </div>
               )}
             </div>
@@ -145,17 +149,11 @@ export default function TafsirPanel({
               <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-destructive">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                 </div>
-                <p className="font-medium text-foreground">
-                  {lang === "ar" ? "تعذّر تحميل التفسير" : "Failed to load tafsir"}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {lang === "ar" ? "تحقق من اتصالك بالإنترنت" : "Check your internet connection"}
-                </p>
+                <p className="font-medium text-foreground">{lang === "ar" ? "تعذّر تحميل التفسير" : "Failed to load tafsir"}</p>
+                <p className="text-sm text-muted-foreground">{lang === "ar" ? "تحقق من اتصالك بالإنترنت" : "Check your internet connection"}</p>
               </div>
             )}
 
@@ -164,9 +162,7 @@ export default function TafsirPanel({
                 <p className={`text-sm font-medium text-muted-foreground mb-3 ${lang === "en" ? "text-left" : "text-right"}`}>
                   {lang === "ar" ? `تفسير ${data.tafsirName}` : `Tafsir: ${data.tafsirName}`}
                 </p>
-                <p
-                  className={`text-foreground leading-relaxed whitespace-pre-line font-sans text-base ${lang === "ar" ? "text-right" : "text-left"}`}
-                >
+                <p className={`text-foreground leading-relaxed whitespace-pre-line font-sans text-base ${lang === "ar" ? "text-right" : "text-left"}`}>
                   {stripHtml(data.text)}
                 </p>
               </div>
