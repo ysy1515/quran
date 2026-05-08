@@ -118,8 +118,15 @@ workflows:
 
           cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
 
-          APP_VERSION="1.0.1"
-          BUILD_NUMBER="${CM_BUILD_NUMBER:-2}"
+          APP_VERSION="1.0.2"
+
+          RAW_BUILD_NUMBER="${CM_BUILD_NUMBER:-10}"
+
+          if [ "$RAW_BUILD_NUMBER" -lt 10 ]; then
+            BUILD_NUMBER="10"
+          else
+            BUILD_NUMBER="$RAW_BUILD_NUMBER"
+          fi
 
           echo "Using iOS app version: $APP_VERSION"
           echo "Using iOS build number: $BUILD_NUMBER"
