@@ -16,33 +16,42 @@ workflows:
         bundle_identifier: com.yahya.quran
 
     scripts:
+      - name: Go to repository root
+        script: |
+          cd "$CM_BUILD_DIR"
+          pwd
+          ls -la
+
       - name: Install pnpm
         script: |
+          cd "$CM_BUILD_DIR"
           corepack enable
           corepack prepare pnpm@10.26.1 --activate
+          pnpm --version
 
       - name: Install dependencies from repository root
         script: |
+          cd "$CM_BUILD_DIR"
           pnpm install
 
       - name: Build mobile web app
         script: |
-          cd artifacts/quran
+          cd "$CM_BUILD_DIR/artifacts/quran"
           pnpm build:mobile
 
       - name: Sync Capacitor iOS
         script: |
-          cd artifacts/quran
+          cd "$CM_BUILD_DIR/artifacts/quran"
           npx cap sync ios
 
       - name: Apply iOS provisioning profiles
         script: |
-          cd artifacts/quran/ios/App
+          cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
           xcode-project use-profiles
 
       - name: Build iOS IPA
         script: |
-          cd artifacts/quran/ios/App
+          cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
           xcode-project build-ipa \
             --workspace App.xcworkspace \
             --scheme App
