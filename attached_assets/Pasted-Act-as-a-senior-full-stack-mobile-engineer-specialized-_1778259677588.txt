@@ -1,0 +1,157 @@
+Act as a senior full-stack mobile engineer specialized in Capacitor, iOS, Android, and push notifications.
+
+I have an existing Quran web app that will be published as native iOS and Android apps using Capacitor.
+
+Required goal:
+Implement a professional push notification system for prayer time / adhan reminders.
+
+Important constraints:
+- Do not change the database structure unless absolutely required.
+- Do not break the existing web app.
+- Do not break the current Quran, prayer times, muezzin, adhkar, or settings features.
+- Keep Arabic RTL layout intact.
+- Keep the current UI design unless a small settings section is required.
+- Do not publish anything automatically.
+- Do not hardcode private keys or secrets in the frontend.
+
+Core requirements:
+
+1. Add Capacitor Push Notifications support:
+   - Install and configure @capacitor/push-notifications.
+   - Configure iOS push notification registration.
+   - Configure Android push notification registration.
+   - Add required Android notification permissions.
+   - Handle iOS permission request properly.
+   - Handle Android 13+ POST_NOTIFICATIONS permission.
+
+2. Device token registration:
+   - When the user allows notifications, register the device token.
+   - Store the token safely through the backend/API.
+   - Store at minimum:
+     - deviceToken
+     - platform: ios / android / web
+     - userId or anonymousDeviceId if no login exists
+     - selected city/location if available
+     - selected prayer notification preferences
+     - selected muezzin
+     - createdAt / updatedAt
+   - Do not duplicate the same token repeatedly.
+
+3. Notification settings screen:
+   Add or improve a simple Arabic settings section where the user can control:
+   - تفعيل / إيقاف الإشعارات
+   - إشعار الفجر
+   - إشعار الظهر
+   - إشعار العصر
+   - إشعار المغرب
+   - إشعار العشاء
+   - تذكير قبل الصلاة: 5 / 10 / 15 دقيقة
+   - اختيار صوت المؤذن للتنبيه داخل التطبيق إن كان مدعومًا
+   - ملاحظة واضحة أن صوت الإشعار الكامل قد يختلف حسب قيود iOS وAndroid
+
+4. Prayer time scheduling logic:
+   - Use the existing prayer time source in the app if available.
+   - Calculate today’s and tomorrow’s prayer notification times.
+   - Support user’s selected city/location.
+   - Do not send duplicate notifications.
+   - If local notifications are more appropriate, implement Capacitor Local Notifications for on-device scheduled prayer reminders.
+   - If server push is required, document the backend scheduler requirements clearly.
+
+5. Push vs Local notification decision:
+   Implement the best practical approach:
+   - For scheduled prayer reminders on the same device, use Capacitor Local Notifications.
+   - For remote announcements or server-triggered reminders, use Push Notifications.
+   - If both are needed, implement both clearly:
+     - Local Notifications: prayer-time reminders
+     - Push Notifications: admin announcements / remote updates
+
+6. Audio behavior:
+   - Fix the current muezzin preview audio issue.
+   - Audio preview must only play after user taps play.
+   - Do not attempt autoplay.
+   - Stop current audio when another muezzin is played.
+   - Show Arabic error if audio file is missing:
+     "ملف الصوت غير متوفر حالياً"
+
+7. Notification sound limitations:
+   - Do not promise full adhan playback in background unless technically supported.
+   - For iOS and Android notification sounds, use short bundled notification sounds if supported.
+   - Add documentation explaining where to place custom notification sound files for:
+     - Android res/raw
+     - iOS app bundle
+   - Keep fallback to default notification sound.
+
+8. Android requirements:
+   - Add Firebase configuration support if remote push is implemented.
+   - Document where to place google-services.json.
+   - Ensure AndroidManifest permissions are correct.
+   - Ensure notification channel is created for prayer reminders.
+   - Channel name in Arabic:
+     "تنبيهات الصلاة"
+   - Channel description:
+     "تنبيهات مواقيت الصلاة والأذان"
+
+9. iOS requirements:
+   - Configure APNs capability documentation.
+   - Document Apple Developer requirements:
+     - Push Notifications capability
+     - Background Modes if needed
+     - APNs key/cert setup
+   - Explain TestFlight testing steps.
+
+10. Backend/API:
+   If backend support is needed:
+   - Add API endpoints:
+     - POST /api/notifications/register-device
+     - POST /api/notifications/update-preferences
+     - DELETE /api/notifications/unregister-device
+   - Validate inputs.
+   - Never expose private notification keys to the frontend.
+   - Add environment variable documentation.
+
+11. Documentation:
+   Add a file:
+   MOBILE_NOTIFICATIONS.md
+
+   It must explain:
+   - What was implemented
+   - Difference between Local Notifications and Push Notifications
+   - Android setup
+   - iOS setup
+   - Required environment variables
+   - Testing checklist
+   - Known platform limitations
+   - How to prepare for Google Play and App Store review
+
+12. Testing:
+   Provide clear test steps for:
+   - Browser preview
+   - Android emulator/device
+   - iOS TestFlight
+   - Permission denied case
+   - Permission allowed case
+   - Prayer reminder scheduling
+   - Token registration
+   - Audio preview
+
+Expected behavior:
+- User opens notification settings.
+- User enables notifications.
+- App requests permission correctly.
+- Device token is registered if remote push is available.
+- Prayer reminders can be scheduled locally on the device.
+- User can enable/disable each prayer notification.
+- App does not show false errors.
+- App remains stable on Replit web version.
+- Native iOS/Android build remains compatible with Capacitor.
+
+After completing, provide:
+- Root cause of the current audio issue
+- What notification approach was implemented
+- Changed files summary
+- Commands to run
+- Required environment variables
+- Android build notes
+- iOS build notes
+- Testing checklist
+- Any remaining manual setup required in Apple Developer, Firebase, or Codemagic
