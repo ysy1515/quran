@@ -112,6 +112,22 @@ workflows:
           echo "Apply provisioning profiles"
           xcode-project use-profiles
 
+      - name: Increment iOS build number
+        script: |
+          set -euo pipefail
+
+          cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
+
+          BUILD_NUMBER="${CM_BUILD_NUMBER:-2}"
+
+          echo "Using iOS build number: $BUILD_NUMBER"
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" App/Info.plist
+
+          echo "Final CFBundleVersion:"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" App/Info.plist
+
       - name: Build iOS IPA
         script: |
           set -euo pipefail
