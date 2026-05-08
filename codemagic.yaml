@@ -8,7 +8,7 @@ workflows:
       app_store_connect: Codemagic Quran
 
     environment:
-      node: latest
+      node: 22
       xcode: latest
       cocoapods: default
       ios_signing:
@@ -18,6 +18,8 @@ workflows:
     scripts:
       - name: Check repository structure
         script: |
+          set -euo pipefail
+
           echo "Current directory:"
           pwd
 
@@ -32,6 +34,8 @@ workflows:
 
       - name: Install pnpm without Corepack
         script: |
+          set -euo pipefail
+
           cd "$CM_BUILD_DIR"
 
           echo "Disable Corepack to avoid yarn packageManager conflict"
@@ -40,18 +44,32 @@ workflows:
           echo "Install pnpm globally using npm"
           npm install -g pnpm@10.26.1
 
+          echo "Node version:"
+          node --version
+
           echo "pnpm version:"
           pnpm --version
 
-      - name: Install dependencies from repository root
+      - name: Clean install workspace dependencies
         script: |
+          set -euo pipefail
+
           cd "$CM_BUILD_DIR"
 
-          echo "Installing workspace dependencies using pnpm"
-          pnpm install --frozen-lockfile
+          echo "Remove existing node_modules to avoid missing native optional dependencies"
+          rm -rf node_modules
+          find . -name "node_modules" -type d -prune -exec rm -rf '{}' +
+
+          echo "Install workspace dependencies with optional dependencies enabled"
+          pnpm install --no-frozen-lockfile --config.optional=true
+
+          echo "Verify Rollup native package for macOS ARM64"
+          pnpm add -w -D @rollup/rollup-darwin-arm64@4.59.0 --config.optional=true
 
       - name: Build mobile web app
         script: |
+          set -euo pipefail
+
           cd "$CM_BUILD_DIR/artifacts/quran"
 
           echo "Building mobile web app"
@@ -63,6 +81,8 @@ workflows:
 
       - name: Sync Capacitor iOS
         script: |
+          set -euo pipefail
+
           cd "$CM_BUILD_DIR/artifacts/quran"
 
           echo "Sync Capacitor iOS"
@@ -70,6 +90,8 @@ workflows:
 
       - name: Apply iOS provisioning profiles
         script: |
+          set -euo pipefail
+
           cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
 
           echo "Apply provisioning profiles"
@@ -77,6 +99,8 @@ workflows:
 
       - name: Build iOS IPA
         script: |
+          set -euo pipefail
+
           cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
 
           echo "Available iOS files:"
