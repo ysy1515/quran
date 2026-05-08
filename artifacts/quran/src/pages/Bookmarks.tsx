@@ -16,39 +16,35 @@ export default function Bookmarks() {
   const handleDelete = (id: number) => {
     deleteBookmark.mutate(
       { id },
-      { onSuccess: () => toast.success("تمت إزالة العلامة") }
+      { onSuccess: () => toast.success("تمت إزالة علامة التوقف") }
     );
   };
 
-  // Sort: most recent first
+  // Only the single latest stop matters
   const sorted = bookmarks ? [...bookmarks].sort((a, b) => b.id - a.id) : [];
-  const lastBookmark = sorted[0];
+  const latestStop = sorted[0] ?? null;
 
   return (
     <div className="page-enter max-w-2xl mx-auto px-4 py-6" dir="rtl">
       <h1 className="font-quran text-2xl font-bold text-foreground mb-2 text-center">
-        العلامات المرجعية
+        موضع التوقف
       </h1>
       <p className="text-center text-sm text-muted-foreground mb-6">
-        علامات توقفك في القراءة
+        آخر مكان توقفت فيه أثناء القراءة
       </p>
 
       {isLoading && (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="skeleton h-24 rounded-xl" />
-          ))}
-        </div>
+        <div className="skeleton h-44 rounded-2xl" />
       )}
 
-      {!isLoading && sorted.length === 0 && (
+      {!isLoading && !latestStop && (
         <div className="text-center py-20">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" className="w-8 h-8 text-muted-foreground">
               <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
             </svg>
           </div>
-          <p className="font-medium text-foreground mb-1">لا توجد علامات بعد</p>
+          <p className="font-medium text-foreground mb-1">لا يوجد موضع محفوظ حالياً</p>
           <p className="text-sm text-muted-foreground mb-5">
             اضغط على أي آية أثناء القراءة ثم اختر «ضع علامة هنا»
           </p>
@@ -64,92 +60,69 @@ export default function Bookmarks() {
         </div>
       )}
 
-      {sorted.length > 0 && (
-        <>
-          {/* Last reading position — prominent card */}
-          {lastBookmark && (
-            <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 mb-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                <span className="text-xs font-medium text-primary">آخر موضع توقفت عنده</span>
+      {latestStop && (
+        <div className="space-y-4">
+          <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              <span className="text-xs font-medium text-primary">آخر موضع توقفت عنده</span>
+            </div>
+
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-14 h-14 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-primary">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
+                </svg>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-primary">
-                    <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-quran text-lg font-bold text-foreground">{lastBookmark.surahName}</p>
-                  <p className="text-sm text-muted-foreground">الآية {lastBookmark.verseNumber} • صفحة {lastBookmark.pageNumber}</p>
-                </div>
-                <Link
-                  href={`/mushaf/${lastBookmark.surahNumber}`}
-                  className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity active:scale-95"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5 rotate-180">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                  أكمل
-                </Link>
+              <div className="flex-1 min-w-0">
+                <p className="font-quran text-xl font-bold text-foreground">{latestStop.surahName}</p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  الآية {latestStop.verseNumber}
+                  {latestStop.pageNumber ? ` • صفحة ${latestStop.pageNumber}` : ""}
+                </p>
+                {latestStop.createdAt && (
+                  <p className="text-xs text-muted-foreground/60 mt-1">
+                    {new Date(latestStop.createdAt).toLocaleDateString("ar-SA", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </p>
+                )}
               </div>
             </div>
-          )}
 
-          {/* All bookmarks list */}
-          {sorted.length > 1 && (
-            <>
-              <p className="text-xs font-medium text-muted-foreground mb-2 px-1">
-                جميع العلامات ({sorted.length})
-              </p>
-              <div className="space-y-2">
-                {sorted.map((bookmark, index) => (
-                  <div
-                    key={bookmark.id}
-                    className={`bg-card border rounded-xl p-4 transition-colors ${
-                      index === 0 ? "border-primary/20" : "border-border hover:border-primary/20"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-bold text-muted-foreground" style={{ direction: "ltr" }}>
-                          {bookmark.surahNumber}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-quran text-sm font-bold text-foreground">{bookmark.surahName}</span>
-                          {index === 0 && (
-                            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">الأخير</span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">الآية {bookmark.verseNumber} • ص {bookmark.pageNumber}</p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Link
-                          href={`/mushaf/${bookmark.surahNumber}`}
-                          className="px-2.5 py-1.5 rounded-lg bg-muted text-foreground text-xs font-medium hover:bg-primary/10 hover:text-primary transition-colors"
-                        >
-                          اذهب
-                        </Link>
-                        <button
-                          onClick={() => handleDelete(bookmark.id)}
-                          className="w-7 h-7 rounded-lg hover:bg-destructive/10 transition-colors flex items-center justify-center text-muted-foreground hover:text-destructive"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-3.5 h-3.5">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-                            <path d="M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </>
+            <div className="flex gap-3">
+              <Link
+                href={`/mushaf/${latestStop.surahNumber}`}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity active:scale-95"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 rotate-180">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+                أكمل القراءة من هنا
+              </Link>
+              <button
+                onClick={() => handleDelete(latestStop.id)}
+                className="px-4 py-3 rounded-xl bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors active:scale-95 flex items-center gap-1.5 text-sm font-medium"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4 h-4">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                </svg>
+                مسح
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-muted/40 rounded-xl px-4 py-3 text-center">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              عند إضافة علامة جديدة ستحل محل هذه العلامة تلقائياً
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

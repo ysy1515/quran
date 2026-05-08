@@ -7,6 +7,7 @@ import {
 } from "@workspace/api-client-react";
 import { toast } from "sonner";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { APP_CONFIG, isCapacitorNative, getCapacitorPlatform } from "@/lib/appConfig";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -109,6 +110,37 @@ export default function Settings() {
     const newPrefs = { ...push.prefs, [key]: value };
     await push.updatePreferences(newPrefs);
     toast.success("تم حفظ التفضيلات");
+  };
+
+  const handleShare = async () => {
+    const { shareTitle, shareText, website } = APP_CONFIG;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: shareTitle, text: shareText, url: website });
+        return;
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(website);
+      toast.success("تم نسخ رابط التطبيق");
+    } catch {
+      toast.error("تعذّر النسخ");
+    }
+  };
+
+  const handleRateApp = () => {
+    const platform = getCapacitorPlatform();
+    if (platform === "ios" && APP_CONFIG.iosAppStoreUrl) {
+      window.open(APP_CONFIG.iosAppStoreUrl, "_blank");
+    } else if (platform === "android" && APP_CONFIG.androidPlayStoreUrl) {
+      window.open(APP_CONFIG.androidPlayStoreUrl, "_blank");
+    } else if (isCapacitorNative()) {
+      toast.info("سيكون التقييم متاحاً بعد نشر التطبيق في المتجر قريباً");
+    } else {
+      window.open(APP_CONFIG.website, "_blank");
+    }
   };
 
   const sl = {
@@ -278,6 +310,46 @@ export default function Settings() {
             ))}
           </div>
         )}
+
+        {/* Share & Rate */}
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <button
+            onClick={handleShare}
+            className="w-full flex items-center gap-4 px-5 py-4 hover:bg-muted/50 transition-colors active:bg-muted text-right border-b border-border"
+          >
+            <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center flex-shrink-0">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4.5 h-4.5 text-blue-500 dark:text-blue-400 w-5 h-5">
+                <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">مشاركة التطبيق</p>
+              <p className="text-xs text-muted-foreground">شارك رابط التطبيق مع أصدقائك</p>
+            </div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4 h-4 text-muted-foreground rotate-180">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+
+          <button
+            onClick={handleRateApp}
+            className="w-full flex items-center gap-4 px-5 py-4 hover:bg-muted/50 transition-colors active:bg-muted text-right"
+          >
+            <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-950 flex items-center justify-center flex-shrink-0">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-amber-500">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">تقييم التطبيق</p>
+              <p className="text-xs text-muted-foreground">دعمك يساعدنا على التطوير</p>
+            </div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4 h-4 text-muted-foreground rotate-180">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );

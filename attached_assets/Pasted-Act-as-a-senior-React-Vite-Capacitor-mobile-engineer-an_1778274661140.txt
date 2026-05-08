@@ -1,0 +1,347 @@
+Act as a senior React/Vite/Capacitor mobile engineer and product-focused frontend engineer.
+
+The Quran app is now mostly working. I need a focused enhancement and cleanup update across the following areas:
+1. Adhan/Muezzin selection page
+2. Last reading stop/bookmark behavior
+3. Reading statistics accuracy
+4. Tafsir display shortening
+5. App sharing option
+6. App rating option
+
+Project path:
+artifacts/quran
+
+Important constraints:
+- Do not break the Quran, Mushaf, prayer times, adhkar, notifications, or Capacitor setup.
+- Do not change the database unless absolutely required.
+- Keep Arabic RTL layout.
+- Keep the app working on:
+  - Replit web
+  - production web
+  - iOS Capacitor/TestFlight
+  - Android Capacitor
+- Do not use Quran recitation, basmalah, or placeholder audio as adhan fallback.
+- Do not show unavailable or old adhan items.
+- Keep changes minimal, stable, and production-ready.
+
+==================================================
+TASK 1: Update Adhan/Muezzin selection page
+==================================================
+
+Current issue:
+The Adhan page still shows the old muezzin list.
+I have uploaded only 5 real adhan MP3 files into:
+
+artifacts/quran/public/audio/adhan/
+
+Required:
+Update the Adhan/Muezzin page so it uses only the actual uploaded MP3 files in this folder.
+
+Tasks:
+1. Inspect:
+   artifacts/quran/public/audio/adhan/
+
+2. Detect the 5 uploaded MP3 files and use them as the source of truth.
+
+3. Replace the old muezzin list with a clean list based only on the existing MP3 files.
+
+4. Each item must include:
+   - id
+   - Arabic display name
+   - audioUrl
+   - availability status
+
+5. Use audio paths like:
+   /audio/adhan/file-name.mp3
+
+6. The user must be able to:
+   - preview/play each adhan
+   - stop current audio when another preview starts
+   - select one adhan as the preferred adhan sound
+   - save the selected adhan
+   - see which adhan is currently selected
+
+7. If filenames are not human-readable:
+   Generate clean Arabic display names from filenames:
+   - adhan-1.mp3 → أذان 1
+   - makkah.mp3 → أذان مكة
+   - madinah.mp3 → أذان المدينة
+
+8. If a file is missing:
+   - Do not show it.
+   - Do not show old unavailable muezzins.
+
+9. Audio playback:
+   - Play only after user taps preview.
+   - Do not autoplay.
+   - Stop current audio when another starts.
+   - Show loading, playing, paused states.
+   - If playback fails, show:
+     "تعذر تشغيل الأذان، يرجى المحاولة مرة أخرى"
+
+==================================================
+TASK 2: Fix last reading stop/bookmark behavior
+==================================================
+
+Current issue:
+When the user adds a bookmark/stop marker and then goes to the bookmarks/stops page, the latest marker does not appear correctly.
+Also, the app currently collects multiple bookmarks/stops, but I want only the latest reading stop.
+
+Required:
+Change bookmark/stop behavior to keep only ONE latest reading stop.
+
+Rules:
+1. Do not keep a list of all bookmarks.
+2. Keep only the latest stop position.
+3. When user adds a new stop marker:
+   - Replace the previous stop marker.
+   - Save only the new latest stop.
+4. The stop/bookmark page should show only:
+   - آخر موضع توقفت عنده
+5. User must be able to tap it and return directly to that ayah/page/surah.
+6. Do not show old accumulated bookmarks.
+7. If there is no saved stop, show:
+   "لا يوجد موضع محفوظ حالياً"
+
+Suggested storage:
+Use the existing storage system if available.
+If localStorage is used, store one object only, for example:
+
+latestReadingStop = {
+  surahNumber,
+  surahName,
+  ayahNumber,
+  pageNumber,
+  juzNumber,
+  savedAt
+}
+
+Do not store an array unless needed internally, and if an array exists now, migrate it to keep only the last item.
+
+==================================================
+TASK 3: Fix reading statistics
+==================================================
+
+Current issue:
+Statistics show:
+- العلامات: 5
+- الصفحات المقروءة: 604
+
+This is incorrect.
+I did not read 604 pages.
+Bookmarks should no longer be counted as 5 because there should only be one latest stop.
+
+Required:
+Make statistics accurate and realistic.
+
+Tasks:
+1. Remove "العلامات" count from statistics, or change it to reflect only one latest stop if needed.
+Preferred:
+Remove "العلامات" from the statistics cards completely.
+
+2. Fix "الصفحات المقروءة":
+   - Do not count total Quran pages as read.
+   - Do not default to 604.
+   - Count only actually completed/read pages.
+   - If no real read-tracking exists, show 0 instead of 604.
+   - If read-tracking exists, count unique pages the user actually opened/read.
+   - Maximum should not exceed 604.
+
+3. Fix "الأجزاء المكتملة":
+   - Should not say 30 unless all juz are actually completed.
+   - If no reliable tracking exists, show 0.
+   - If tracking exists, calculate based on completed pages/ayahs per juz.
+
+4. Make the statistics conservative:
+   - If data is unknown, show 0.
+   - Do not inflate progress.
+   - Do not assume the full Quran was read.
+
+5. Ensure statistics update correctly after the user reads or saves latest stop.
+
+==================================================
+TASK 4: Shorten Tafsir display while keeping Ibn Kathir meaning
+==================================================
+
+Current issue:
+When tapping an ayah, the Tafsir appears and works, but it is too long.
+
+Required:
+Display a concise, clear summary of Tafsir Ibn Kathir for the selected ayah.
+
+Important:
+- Do not invent meanings.
+- Do not modify the religious meaning.
+- Do not fabricate tafsir content.
+- If the current source is Ibn Kathir, use the same source.
+- The displayed tafsir should be shorter and clearer.
+- If a pre-existing short tafsir source is available, use it.
+- If only long Ibn Kathir text exists, show a concise excerpt/summary based on the existing text.
+- Do not rely on AI generation at runtime.
+
+Preferred behavior:
+1. When user taps an ayah:
+   - Show ayah text.
+   - Show concise tafsir under title:
+     "تفسير مختصر"
+2. Keep an option/button:
+   "عرض التفسير الكامل"
+   so the user can expand the full Ibn Kathir text if desired.
+3. Default view should be concise.
+4. Full text remains available but collapsed.
+5. If no tafsir exists, show:
+   "لا يتوفر تفسير لهذه الآية حالياً"
+
+Implementation guidance:
+- If tafsir text is long, create a deterministic shortening helper:
+  - remove repeated chains where possible only if safe
+  - limit default preview to a reasonable number of characters/sentences
+  - do not cut in the middle of a sentence if possible
+- Keep the full text accessible.
+
+==================================================
+TASK 5: Add app sharing option in Settings
+==================================================
+
+Required:
+Add a "مشاركة التطبيق" option in Settings.
+
+Behavior:
+1. On native iOS/Android Capacitor:
+   - Use Capacitor Share plugin if available.
+   - If not installed, install/configure @capacitor/share.
+   - Use native share sheet.
+
+2. On web:
+   - Use Web Share API if available.
+   - Otherwise copy app link to clipboard and show:
+     "تم نسخ رابط التطبيق"
+
+Suggested share text:
+"حمّل تطبيق القرآن الكريم - أذان وأذكار"
+
+Suggested URL:
+Use the production URL for now:
+https://quran.yahya.app
+
+If platform-specific store URLs are configured later, use them:
+- iOS App Store URL for iOS
+- Google Play URL for Android
+- fallback to https://quran.yahya.app
+
+UI:
+Add a clear settings row:
+"مشاركة التطبيق"
+with a share icon if available.
+
+==================================================
+TASK 6: Add app rating option in Settings
+==================================================
+
+Required:
+Add "تقييم التطبيق" option in Settings.
+
+Behavior:
+1. Detect platform:
+   - iOS Capacitor → open App Store rating/review page when App Store URL/App ID is available.
+   - Android Capacitor → open Google Play rating page when package/store URL is available.
+   - Web → open production website or show a friendly message.
+
+2. If the final store links are not available yet:
+   - Use placeholders in one config file only.
+   - Do not hardcode broken links across components.
+   - For now, show:
+     "سيكون التقييم متاحاً بعد نشر التطبيق في المتجر"
+   if store URL is not configured.
+
+3. Add a centralized config:
+   appLinks = {
+     website: "https://quran.yahya.app",
+     iosAppStoreUrl: "",
+     androidPlayStoreUrl: ""
+   }
+
+4. In native iOS:
+   If iosAppStoreUrl exists, open it.
+   Else show the message above.
+
+5. In native Android:
+   If androidPlayStoreUrl exists, open it.
+   Else show the message above.
+
+6. Use Capacitor Browser plugin or window.open safely.
+If needed, install/configure:
+@capacitor/browser
+
+UI:
+Add a settings row:
+"تقييم التطبيق"
+with a star icon if available.
+
+==================================================
+Build verification
+==================================================
+
+After all fixes, run from repository root:
+
+pnpm install
+cd artifacts/quran
+pnpm build:mobile
+npx cap sync ios
+npx cap sync android
+
+Verify:
+1. Build succeeds.
+2. Adhan page shows only the 5 uploaded MP3 files.
+3. Each adhan preview works from:
+   /audio/adhan/file-name.mp3
+4. Files are copied to:
+   dist/mobile/audio/adhan/
+   ios/App/App/public/audio/adhan/
+   android/app/src/main/assets/public/audio/adhan/
+5. Latest reading stop page shows only one latest stop.
+6. Adding a new stop replaces the old one.
+7. Statistics no longer show fake bookmarks count.
+8. Pages read does not default to 604.
+9. Completed juz does not default to 30 unless truly completed.
+10. Tafsir opens in concise mode by default with full text expandable.
+11. Settings contains:
+   - مشاركة التطبيق
+   - تقييم التطبيق
+12. Sharing works on web and uses native share on Capacitor if available.
+13. Rating option handles missing store URLs gracefully.
+
+==================================================
+Documentation
+==================================================
+
+Update or create:
+MOBILE_FEATURE_UPDATES.md
+
+Include:
+- Detected 5 adhan files and displayed names
+- How to add/change adhan files in the future
+- Explanation of latest reading stop behavior
+- How reading statistics are calculated
+- Tafsir concise/full behavior
+- Share and rating configuration
+- Remaining manual steps:
+  - Add App Store URL after Apple approval
+  - Add Google Play URL after Android publishing
+  - Run Codemagic build after pushing changes
+
+==================================================
+Final response required
+==================================================
+
+After completion, provide:
+1. The 5 adhan files detected.
+2. Final displayed adhan names.
+3. Files changed.
+4. Root cause of old muezzin list issue.
+5. Root cause of bookmark/latest stop issue.
+6. How statistics are now calculated.
+7. How tafsir is shortened safely.
+8. Share/rating implementation details.
+9. Build/test results.
+10. Confirmation that I must push to GitHub and run a new Codemagic build for TestFlight.

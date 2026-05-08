@@ -89,8 +89,7 @@ export default function Home() {
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-3 gap-3 mb-8">
-          <StatCard label="العلامات" value={stats.totalBookmarks} />
+        <div className="grid grid-cols-2 gap-3 mb-8">
           <StatCard label="الصفحات المقروءة" value={stats.pagesRead} />
           <StatCard label="الأجزاء المكتملة" value={stats.completedJuz} />
         </div>

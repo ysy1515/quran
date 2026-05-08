@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Drawer } from "vaul";
 import { useGetVerseTafsir, getGetVerseTafsirQueryKey } from "@workspace/api-client-react";
 
@@ -21,6 +21,23 @@ function stripHtml(html: string): string {
 const TAFSIR_AR = 14;
 const TAFSIR_EN = 169;
 
+const CONCISE_CHARS = 380;
+
+function getConciseTafsir(text: string): { preview: string; isTruncated: boolean } {
+  if (text.length <= CONCISE_CHARS) return { preview: text, isTruncated: false };
+  // Cut at last Arabic sentence boundary before limit
+  const slice = text.slice(0, CONCISE_CHARS);
+  const lastDot = Math.max(
+    slice.lastIndexOf(".\n"),
+    slice.lastIndexOf(".\r"),
+    slice.lastIndexOf(". "),
+    slice.lastIndexOf("،"),
+    slice.lastIndexOf("\n"),
+  );
+  const cutAt = lastDot > 150 ? lastDot + 1 : slice.lastIndexOf(" ");
+  return { preview: text.slice(0, Math.max(cutAt, 100)).trimEnd() + "…", isTruncated: true };
+}
+
 export default function TafsirPanel({
   open,
   onClose,
@@ -33,6 +50,10 @@ export default function TafsirPanel({
   onBookmark,
 }: TafsirPanelProps) {
   const [lang, setLang] = useState<"ar" | "en">("ar");
+  const [showFull, setShowFull] = useState(false);
+
+  // Reset to concise view whenever a different verse is opened
+  useEffect(() => { setShowFull(false); }, [surahNumber, verseNumber]);
 
   const activeTafsirId = lang === "ar" ? TAFSIR_AR : TAFSIR_EN;
 
@@ -157,16 +178,42 @@ export default function TafsirPanel({
               </div>
             )}
 
-            {data && (
-              <div dir={lang === "ar" ? "rtl" : "ltr"}>
-                <p className={`text-sm font-medium text-muted-foreground mb-3 ${lang === "en" ? "text-left" : "text-right"}`}>
-                  {lang === "ar" ? `تفسير ${data.tafsirName}` : `Tafsir: ${data.tafsirName}`}
-                </p>
-                <p className={`text-foreground leading-relaxed whitespace-pre-line font-sans text-base ${lang === "ar" ? "text-right" : "text-left"}`}>
-                  {stripHtml(data.text)}
-                </p>
-              </div>
-            )}
+            {data && (() => {
+              const fullText = stripHtml(data.text);
+              const { preview, isTruncated } = getConciseTafsir(fullText);
+              return (
+                <div dir={lang === "ar" ? "rtl" : "ltr"}>
+                  <div className={`flex items-center justify-between mb-3 ${lang === "en" ? "flex-row-reverse" : ""}`}>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {lang === "ar"
+                        ? showFull ? `تفسير ${data.tafsirName} (كامل)` : "تفسير مختصر"
+                        : showFull ? `Tafsir: ${data.tafsirName} (full)` : "Summary"}
+                    </p>
+                    {isTruncated && (
+                      <button
+                        onClick={() => setShowFull((v) => !v)}
+                        className="text-xs text-primary hover:underline font-medium px-2 py-0.5 rounded-lg hover:bg-primary/10 transition-colors"
+                      >
+                        {showFull
+                          ? (lang === "ar" ? "تقليص" : "Collapse")
+                          : (lang === "ar" ? "عرض التفسير الكامل" : "Show full tafsir")}
+                      </button>
+                    )}
+                  </div>
+                  <p className={`text-foreground leading-relaxed whitespace-pre-line font-sans text-base ${lang === "ar" ? "text-right" : "text-left"}`}>
+                    {showFull ? fullText : preview}
+                  </p>
+                  {isTruncated && !showFull && (
+                    <button
+                      onClick={() => setShowFull(true)}
+                      className="mt-4 w-full py-2.5 rounded-xl border border-primary/30 text-primary text-sm font-medium hover:bg-primary/5 transition-colors"
+                    >
+                      {lang === "ar" ? "عرض التفسير الكامل" : "Show full tafsir"}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </Drawer.Content>
       </Drawer.Portal>

@@ -91,7 +91,10 @@ router.get("/stats", async (req, res): Promise<void> => {
       .limit(1);
 
     const lastPage = progress?.lastPageNumber ?? 1;
-    const completedJuz = Math.floor(lastPage / (604 / 30));
+    // Conservative: only count pages the user has moved past (not the current page).
+    // If at default page 1, pagesRead = 0.
+    const pagesRead = lastPage > 1 ? lastPage - 1 : 0;
+    const completedJuz = pagesRead > 0 ? Math.floor(pagesRead / (604 / 30)) : 0;
 
     res.json({
       totalBookmarks: bookmarkCount?.count ?? 0,
@@ -99,7 +102,7 @@ router.get("/stats", async (req, res): Promise<void> => {
       lastReadSurah: progress?.lastSurahName ?? "الفاتحة",
       completedJuz,
       readingStreak: 0,
-      pagesRead: lastPage,
+      pagesRead,
     });
   } catch (err) {
     req.log.error({ err }, "Error fetching stats");

@@ -30,6 +30,11 @@ router.post("/bookmarks", async (req, res): Promise<void> => {
   }
 
   try {
+    // Keep only ONE latest reading stop — delete all previous bookmarks first
+    await db
+      .delete(bookmarksTable)
+      .where(eq(bookmarksTable.sessionId, SESSION_ID));
+
     const [bookmark] = await db
       .insert(bookmarksTable)
       .values({
