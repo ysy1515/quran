@@ -218,9 +218,45 @@ export default function Mushaf() {
         </div>
       )}
 
-      {/* Verses */}
-      {verses.length > 0 && (
-        <div className="space-y-1">
+      {/* Verses — Arabic flowing mode */}
+      {verses.length > 0 && !showTranslation && (
+        <div className="bg-card rounded-2xl border border-border px-5 py-6 shadow-sm">
+          <p
+            className="font-quran text-foreground leading-[2.6] text-right"
+            style={{ fontSize: `${fontSize}%` }}
+            dir="rtl"
+          >
+            {verses.map((verse) => (
+              <span key={verse.id}>
+                <span
+                  className={`cursor-pointer hover:text-primary transition-colors rounded ${
+                    isBookmarked(verse.verseNumber) ? "text-primary" : ""
+                  }`}
+                  onClick={() => handleVerseClick(verse)}
+                >
+                  {verse.text}
+                </span>
+                <span
+                  className="inline-flex items-center justify-center mx-1 cursor-pointer align-middle"
+                  onClick={() => handleVerseClick(verse)}
+                  title={`الآية ${verse.verseNumber}`}
+                >
+                  <span
+                    className="font-sans text-primary/80 hover:text-primary transition-colors select-none"
+                    style={{ fontSize: "55%", lineHeight: 1 }}
+                  >
+                    ﴿{verse.verseNumber}﴾
+                  </span>
+                </span>
+              </span>
+            ))}
+          </p>
+        </div>
+      )}
+
+      {/* Verses — EN translation mode (card per verse) */}
+      {verses.length > 0 && showTranslation && (
+        <div className="space-y-2">
           {verses.map((verse) => (
             <div
               key={verse.id}
@@ -228,14 +264,10 @@ export default function Mushaf() {
               onClick={() => handleVerseClick(verse)}
             >
               <div className="flex items-start gap-3">
-                {/* Verse Number */}
                 <div className="verse-number flex-shrink-0 mt-1" style={{ fontSize: "0.65rem" }}>
                   {verse.verseNumber}
                 </div>
-
-                {/* Verse Content */}
                 <div className="flex-1">
-                  {/* Arabic Text — always shown */}
                   <p
                     className="font-quran text-foreground text-right leading-loose"
                     style={{ fontSize: `${fontSize}%` }}
@@ -243,9 +275,7 @@ export default function Mushaf() {
                   >
                     {verse.text}
                   </p>
-
-                  {/* English Translation — shown when EN mode active */}
-                  {showTranslation && verse.translationText && (
+                  {verse.translationText && (
                     <p
                       className="text-sm text-muted-foreground mt-2 leading-relaxed border-t border-border/50 pt-2"
                       dir="ltr"
@@ -255,8 +285,6 @@ export default function Mushaf() {
                     </p>
                   )}
                 </div>
-
-                {/* Bookmark Button */}
                 <button
                   onClick={(e) => handleBookmark(e, verse)}
                   className={`flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity mt-1 p-1 rounded ${
