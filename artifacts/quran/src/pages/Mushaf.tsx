@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "wouter";
 import {
   useGetSurahVerses,
@@ -12,6 +12,7 @@ import {
   useDeleteBookmark,
   useGetSettings,
   getGetSettingsQueryKey,
+  useUpdateSettings,
 } from "@workspace/api-client-react";
 import TafsirPanel from "@/components/TafsirPanel";
 import { toast } from "sonner";
@@ -52,6 +53,16 @@ export default function Mushaf() {
   const updateProgress = useUpdateReadingProgress();
   const createBookmark = useCreateBookmark();
   const deleteBookmark = useDeleteBookmark();
+  const updateSettings = useUpdateSettings();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const changeFontSize = (newSize: number) => {
+    setFontSize(newSize);
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      updateSettings.mutate({ data: { fontSize: newSize } });
+    }, 600);
+  };
 
   const surah = versesData?.surah;
   const verses = versesData?.verses ?? [];
@@ -139,8 +150,8 @@ export default function Mushaf() {
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={() => setFontSize(Math.max(80, fontSize - 10))} className="w-8 h-8 rounded-lg bg-muted hover:bg-border transition-colors flex items-center justify-center text-xs font-bold text-muted-foreground">ص</button>
-          <button onClick={() => setFontSize(Math.min(160, fontSize + 10))} className="w-9 h-9 rounded-lg bg-muted hover:bg-border transition-colors flex items-center justify-center font-bold text-muted-foreground">ص</button>
+          <button onClick={() => changeFontSize(Math.max(80, fontSize - 10))} className="w-8 h-8 rounded-lg bg-muted hover:bg-border transition-colors flex items-center justify-center text-xs font-bold text-muted-foreground">ص</button>
+          <button onClick={() => changeFontSize(Math.min(160, fontSize + 10))} className="w-9 h-9 rounded-lg bg-muted hover:bg-border transition-colors flex items-center justify-center font-bold text-muted-foreground">ص</button>
         </div>
       </div>
 
