@@ -16,6 +16,7 @@ import {
 } from "@workspace/api-client-react";
 import TafsirPanel from "@/components/TafsirPanel";
 import { toast } from "sonner";
+import { copyToClipboard, formatAyahForCopy } from "@/lib/clipboard";
 
 interface SelectedVerse {
   surahNumber: number;
@@ -313,10 +314,10 @@ export default function Mushaf() {
                 {actionVerse.verseText}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => { toggleBookmark(actionVerse); setActionVerse(null); }}
-                className={`flex items-center justify-center gap-2 py-3.5 rounded-xl font-medium text-sm transition-all active:scale-95 ${
+                className={`flex items-center justify-center gap-1.5 py-3.5 rounded-xl font-medium text-sm transition-all active:scale-95 ${
                   isBookmarked(actionVerse.verseNumber)
                     ? "bg-primary text-primary-foreground"
                     : "bg-primary/10 text-primary hover:bg-primary/20"
@@ -325,16 +326,32 @@ export default function Mushaf() {
                 <svg viewBox="0 0 24 24" fill={isBookmarked(actionVerse.verseNumber) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-4 h-4">
                   <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
                 </svg>
-                {isBookmarked(actionVerse.verseNumber) ? "إزالة العلامة" : "ضع علامة هنا"}
+                {isBookmarked(actionVerse.verseNumber) ? "إزالة" : "علامة"}
               </button>
               <button
                 onClick={() => openTafsir(actionVerse)}
-                className="flex items-center justify-center gap-2 py-3.5 rounded-xl bg-muted text-foreground hover:bg-border font-medium text-sm transition-all active:scale-95"
+                className="flex items-center justify-center gap-1.5 py-3.5 rounded-xl bg-muted text-foreground hover:bg-border font-medium text-sm transition-all active:scale-95"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4 h-4">
                   <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
                 </svg>
-                التفسير
+                تفسير
+              </button>
+              <button
+                onClick={() => {
+                  copyToClipboard(
+                    formatAyahForCopy(actionVerse.verseText, actionVerse.surahName, actionVerse.verseNumber),
+                    "تم نسخ الآية"
+                  );
+                  setActionVerse(null);
+                }}
+                className="flex items-center justify-center gap-1.5 py-3.5 rounded-xl bg-muted text-foreground hover:bg-border font-medium text-sm transition-all active:scale-95"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4 h-4">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                </svg>
+                نسخ
               </button>
             </div>
           </div>

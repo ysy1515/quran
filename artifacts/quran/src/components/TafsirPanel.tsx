@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Drawer } from "vaul";
 import { useGetVerseTafsir, getGetVerseTafsirQueryKey } from "@workspace/api-client-react";
+import { copyToClipboard, formatAyahForCopy } from "@/lib/clipboard";
 
 interface TafsirPanelProps {
   open: boolean;
@@ -146,10 +147,34 @@ export default function TafsirPanel({
             {/* Verse texts */}
             <div className="mt-3 space-y-2">
               <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
+                <div className="flex items-center justify-end mb-1">
+                  <button
+                    onClick={() => copyToClipboard(formatAyahForCopy(verseText, surahName, verseNumber), "تم نسخ الآية")}
+                    className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors px-2 py-0.5 rounded-md hover:bg-primary/10"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-3 h-3">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                    </svg>
+                    نسخ الآية
+                  </button>
+                </div>
                 <p className="font-quran text-lg text-foreground leading-loose text-right" dir="rtl">{verseText}</p>
               </div>
               {translationText && (
                 <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100 dark:border-blue-900/50">
+                  <div className="flex items-center justify-start mb-1">
+                    <button
+                      onClick={() => copyToClipboard(translationText, "تم نسخ الترجمة")}
+                      className="inline-flex items-center gap-1 text-[11px] text-blue-500 hover:text-blue-700 dark:text-blue-400 transition-colors px-2 py-0.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-3 h-3">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                      </svg>
+                      Copy translation
+                    </button>
+                  </div>
                   <p className="text-sm text-foreground leading-relaxed" dir="ltr" style={{ textAlign: "left" }}>{translationText}</p>
                 </div>
               )}

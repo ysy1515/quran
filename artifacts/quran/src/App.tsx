@@ -14,6 +14,8 @@ import Settings from "@/pages/Settings";
 import About from "@/pages/About";
 import Dhikr from "@/pages/Dhikr";
 import Adhan from "@/pages/Adhan";
+import Athkar from "@/pages/Athkar";
+import TafsirPage from "@/pages/TafsirPage";
 import Navigation from "@/components/Navigation";
 import SplashScreen from "@/components/SplashScreen";
 
@@ -43,6 +45,8 @@ function Router() {
           <Route path="/about" component={About} />
           <Route path="/dhikr" component={Dhikr} />
           <Route path="/adhan" component={Adhan} />
+          <Route path="/athkar" component={Athkar} />
+          <Route path="/tafsir-translations" component={TafsirPage} />
           <Route component={NotFound} />
         </Switch>
       </main>
@@ -56,13 +60,11 @@ interface AppProps {
 
 function App({ onMounted }: AppProps) {
   const [showSplash, setShowSplash] = useState<boolean>(() => {
-    // Show only once per browser session
     if (sessionStorage.getItem("splash-shown")) return false;
     sessionStorage.setItem("splash-shown", "1");
     return true;
   });
 
-  // Hide the HTML loading overlay as soon as React mounts successfully
   useEffect(() => {
     onMounted?.();
   }, [onMounted]);

@@ -6,7 +6,9 @@ const navItems = [
   { href: "/surahs", label: "السور", icon: ListIcon },
   { href: "/juz", label: "الأجزاء", icon: LayersIcon },
   { href: "/adhan", label: "الأذان", icon: AdhanIcon },
-  { href: "/dhikr", label: "الأذكار", icon: DhikrIcon },
+  { href: "/athkar", label: "الأذكار", icon: AthkarIcon },
+  { href: "/dhikr", label: "عداد الأذكار", icon: DhikrIcon },
+  { href: "/tafsir-translations", label: "التفسير والترجمات", icon: TafsirIcon },
   { href: "/search", label: "البحث", icon: SearchIcon },
   { href: "/bookmarks", label: "العلامات", icon: BookmarkIcon },
   { href: "/settings", label: "الإعدادات", icon: SettingsIcon },
@@ -18,7 +20,7 @@ const mobileNav = [
   { href: "/", label: "الرئيسية", icon: HomeIcon },
   { href: "/mushaf", label: "المصحف", icon: BookIcon },
   { href: "/adhan", label: "الأذان", icon: AdhanIcon },
-  { href: "/dhikr", label: "الأذكار", icon: DhikrIcon },
+  { href: "/athkar", label: "الأذكار", icon: AthkarIcon },
   { href: "/settings", label: "الإعدادات", icon: SettingsIcon },
 ];
 
@@ -73,12 +75,33 @@ function AdhanIcon() {
   );
 }
 
+function AthkarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-5 h-5">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+      <path d="M8 12h8M12 8v8" />
+    </svg>
+  );
+}
+
 function DhikrIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-5 h-5">
       <circle cx="12" cy="12" r="9" />
       <circle cx="12" cy="12" r="3" />
       <path d="M12 3v2M12 19v2M3 12h2M19 12h2" />
+    </svg>
+  );
+}
+
+function TafsirIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-5 h-5">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <polyline points="10 9 9 9 8 9" />
     </svg>
   );
 }

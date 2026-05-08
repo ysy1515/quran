@@ -1,0 +1,354 @@
+Act as a senior React/Vite/Capacitor mobile engineer and product-focused UI/UX engineer.
+
+We need a focused enhancement update for the Quran app.
+
+Project path:
+artifacts/quran
+
+Main goals:
+1. Fix light/day mode readability issues.
+2. Prepare app icon replacement for iOS and Android.
+3. Add a new page called "الأذكار".
+4. Add a new page called "التفسير والترجمات".
+5. Allow copying any ayah.
+6. Keep the app stable for web, iOS Capacitor/TestFlight, and Android Capacitor.
+
+Important constraints:
+- Do not break the working Quran/Mushaf.
+- Do not break Adhan, notifications, latest stop, statistics, settings, or Capacitor setup.
+- Do not change the database unless absolutely required.
+- Keep Arabic RTL layout.
+- Keep the design clean, premium, and mobile-first.
+- Do not use fake religious content.
+- Use authentic, structured Islamic content where available.
+- If any content source is incomplete, create a clean structure and clearly mark missing content rather than inventing unsupported text.
+
+==================================================
+TASK 1: Fix light/day mode readability
+==================================================
+
+Current issue:
+When the app is in light/day mode, some text and buttons are not clearly visible.
+Examples:
+- Mushaf/page image viewer previous/next buttons are not clear.
+- Settings → Appearance light/dark controls have low-contrast text.
+- Some text appears white or weak on light backgrounds.
+
+Required:
+Fix all light mode contrast/readability issues professionally.
+
+Tasks:
+1. Audit all major screens in light and dark mode:
+   - Home
+   - Quran/Mushaf/page image viewer
+   - Previous/next page buttons
+   - Ayah/Tafsir modal
+   - Adhan/Muezzin page
+   - Settings
+   - Appearance section
+   - Notifications section
+   - Latest reading stop/bookmark page
+   - Statistics cards
+   - New Athkar page
+   - New Tafsir & Translations page
+
+2. Fix light mode text colors:
+   - Avoid white text on light backgrounds.
+   - Use theme-safe classes:
+     text-gray-900 dark:text-white
+     text-gray-700 dark:text-gray-300
+     text-gray-500 dark:text-gray-400
+     bg-white dark:bg-gray-900
+     border-gray-200 dark:border-gray-700
+
+3. Fix Mushaf navigation buttons:
+   - Previous/next buttons must be clear in both modes.
+   - Light mode:
+     background: white or rgba(255,255,255,0.95)
+     text/icon: #111827
+     border: #E5E7EB
+     shadow
+   - Dark mode:
+     background: rgba(17,24,39,0.95)
+     text/icon: white
+     border: rgba(255,255,255,0.15)
+
+4. Fix Settings appearance controls:
+   - Light/Dark labels must be readable.
+   - Selected and unselected states must be clear.
+   - Do not use white text unless the background is dark.
+
+5. If global CSS variables exist, fix them centrally:
+   - src/index.css
+   - src/App.css
+   - Tailwind/theme config
+   - Theme provider
+   - Settings/Appearance components
+
+Expected:
+- All text and buttons are readable in light mode.
+- Dark mode remains clean and readable.
+
+==================================================
+TASK 2: Replace app icon preparation
+==================================================
+
+I want to replace the app icon for both iOS and Android.
+
+New icon file path:
+artifacts/quran/assets/app-icon.png
+
+Tasks:
+1. Verify the source icon exists:
+   artifacts/quran/assets/app-icon.png
+
+2. Validate:
+   - PNG
+   - 1024x1024 recommended
+   - Square
+   - No transparent background if possible
+
+3. Use @capacitor/assets or the existing asset generation method to generate icons for:
+   - iOS
+   - Android
+
+4. Replace generated assets in:
+   - ios/App/App/Assets.xcassets/AppIcon.appiconset/
+   - android/app/src/main/res/mipmap-*/
+   - android/app/src/main/res/drawable*/ if needed
+
+5. Do not change bundle ID:
+   com.yahya.quran
+
+6. If the icon file is missing, do not fail the app build.
+   Instead document:
+   "يرجى رفع ملف الأيقونة في artifacts/quran/assets/app-icon.png"
+
+==================================================
+TASK 3: Add new page "الأذكار"
+==================================================
+
+Add a new page called:
+
+الأذكار
+
+Required categories:
+1. دعاء ختم القرآن
+2. أذكار الصباح
+3. أذكار المساء
+4. أذكار النوم
+5. الأذكار بعد السلام من الصلاة
+6. الرقية الشرعية
+7. الاستغفار
+8. الثناء على الله تعالى
+9. السؤالات
+10. الصلاة على النبي صلى الله عليه وسلم
+11. الاستعاذات
+
+UI requirements:
+1. Add a clean page title:
+   "الأذكار"
+
+2. Show categories as clean cards or sections.
+
+3. Each category should open to a detail page/section showing the related adhkar.
+
+4. Each dhikr item should support:
+   - Arabic text
+   - optional count/repetition
+   - optional short source label if available
+   - copy button
+   - clean readable typography
+
+5. Add search/filter if simple to implement:
+   - Search by category or dhikr text.
+
+6. Keep content manageable and structured.
+   Suggested data structure:
+   src/data/athkar.ts
+   or
+   public/data/athkar.json
+
+7. Do not invent religious text.
+   If using existing verified adhkar content in the project, reuse it.
+   If not available, add a safe structured placeholder only for categories and mark missing content clearly:
+   "سيتم إضافة المحتوى قريباً"
+   But for common categories like morning/evening/sleep/prayer adhkar, use authentic known adhkar only if already available or from a verified bundled source.
+
+8. Add navigation entry for the page:
+   - bottom nav or main menu depending on current app structure.
+   - Label: الأذكار
+   - Icon: suitable icon if available.
+
+9. Ensure page works in:
+   - Web
+   - iOS Capacitor
+   - Android Capacitor
+
+==================================================
+TASK 4: Add new page "التفسير والترجمات"
+==================================================
+
+Add a new page called:
+
+التفسير والترجمات
+
+Purpose:
+The user can access Quran ayahs with tafsir and translations.
+
+Requirements:
+1. Add page title:
+   "التفسير والترجمات"
+
+2. The page should allow the user to:
+   - Select surah
+   - Select ayah
+   - View the ayah text
+   - View concise tafsir by default
+   - Expand full tafsir if available
+   - View translations if translation data exists
+   - Copy the ayah text
+   - Copy tafsir text if available
+   - Copy translation text if available
+
+3. Tafsir:
+   - Use the existing tafsir source if already implemented.
+   - Default view should be concise:
+     Title: "تفسير مختصر"
+   - Add button:
+     "عرض التفسير الكامل"
+   - Do not alter religious meaning.
+   - Do not fabricate tafsir.
+   - If full tafsir exists, keep it expandable.
+   - If no tafsir exists, show:
+     "لا يتوفر تفسير لهذه الآية حالياً"
+
+4. Translations:
+   - If translation data exists, display it.
+   - If not available, show:
+     "الترجمات غير متوفرة حالياً"
+   - Do not invent translations.
+
+5. Add copy features:
+   - Copy ayah:
+     "نسخ الآية"
+   - Copy tafsir:
+     "نسخ التفسير"
+   - Copy translation:
+     "نسخ الترجمة"
+
+6. On successful copy, show toast:
+   "تم النسخ"
+
+7. If copy fails:
+   "تعذر النسخ، يرجى المحاولة مرة أخرى"
+
+8. Use a centralized helper for clipboard copy.
+   On Capacitor, use web clipboard safely unless native clipboard plugin already exists.
+
+9. Add navigation entry:
+   - Label: التفسير والترجمات
+   - Icon if available.
+
+==================================================
+TASK 5: Allow copying any ayah from Quran/Mushaf
+==================================================
+
+Current requirement:
+Any ayah should be copyable.
+
+Tasks:
+1. In the ayah interaction modal or ayah detail view, add:
+   - "نسخ الآية"
+
+2. If tafsir is shown, also allow:
+   - "نسخ التفسير"
+
+3. If translation exists, allow:
+   - "نسخ الترجمة"
+
+4. Copy format for ayah should be clean:
+   Example:
+   {ayah text}
+   - سورة {surahName}، آية {ayahNumber}
+
+5. Show toast:
+   "تم نسخ الآية"
+
+6. Ensure this works on:
+   - Web
+   - iOS Capacitor
+   - Android Capacitor
+
+==================================================
+TASK 6: Keep existing Adhan file behavior
+==================================================
+
+Do not revert the Adhan page.
+It should still use only the actual uploaded MP3 files from:
+
+artifacts/quran/public/audio/adhan/
+
+Rules:
+- Show only available MP3 files.
+- User can preview and select.
+- Do not show old unavailable muezzins.
+- Do not use Quran recitation or basmalah as fallback.
+
+==================================================
+TASK 7: Build verification
+==================================================
+
+After all fixes, run from repository root:
+
+pnpm install
+cd artifacts/quran
+pnpm build:mobile
+npx cap sync ios
+npx cap sync android
+
+Verify:
+1. Build succeeds.
+2. Light mode readability is fixed.
+3. Mushaf previous/next buttons are clear.
+4. Settings Appearance text is readable.
+5. New "الأذكار" page appears and works.
+6. New "التفسير والترجمات" page appears and works.
+7. Ayah copy works.
+8. Tafsir copy works if tafsir exists.
+9. Translation copy works if translation exists.
+10. Adhan page still shows only uploaded MP3 files.
+11. iOS and Android Capacitor sync succeeds.
+12. No placeholder URLs or broken links are introduced.
+
+==================================================
+TASK 8: Documentation
+==================================================
+
+Update or create:
+MOBILE_UI_AND_CONTENT_UPDATES.md
+
+Include:
+- Light mode fixes made
+- App icon replacement steps
+- Athkar page structure and content source
+- Tafsir & translations page behavior
+- Ayah copy behavior
+- How to add more athkar later
+- How to add translation data later
+- Reminder:
+  After changes, push to GitHub and run new Codemagic build for TestFlight.
+
+==================================================
+Final response required
+==================================================
+
+After completion, provide:
+1. Files changed.
+2. Light mode issues fixed.
+3. App icon status: changed or waiting for uploaded app-icon.png.
+4. Athkar categories added.
+5. Tafsir & translations page behavior.
+6. Copy ayah implementation details.
+7. Build/test results.
+8. Confirmation that I must push to GitHub and run a new Codemagic build for TestFlight.
