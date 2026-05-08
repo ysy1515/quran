@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
@@ -13,6 +14,7 @@ import Settings from "@/pages/Settings";
 import About from "@/pages/About";
 import Dhikr from "@/pages/Dhikr";
 import Navigation from "@/components/Navigation";
+import SplashScreen from "@/components/SplashScreen";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,9 +49,17 @@ function Router() {
 }
 
 function App() {
+  const [showSplash, setShowSplash] = useState<boolean>(() => {
+    // Show only once per browser session
+    if (sessionStorage.getItem("splash-shown")) return false;
+    sessionStorage.setItem("splash-shown", "1");
+    return true;
+  });
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+        {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Router />
           <Toaster position="top-center" richColors />
