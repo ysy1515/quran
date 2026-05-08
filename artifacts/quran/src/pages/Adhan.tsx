@@ -18,7 +18,7 @@ interface Muezzin {
   mosque: string;
   country: string;
   emoji: string;
-  audioUrl: string;
+  audioUrl: string | null;
 }
 
 interface AdhanPrefs {
@@ -42,11 +42,6 @@ const PRAYER_LABELS: Record<string, string> = {
   isha: "العشاء",
 };
 
-// CDN base — cdn.islamic.network hosts verified Quran recitations by these reciters
-// URL format: https://cdn.islamic.network/quran/audio/128/{reciter}/1.mp3  (Surah Al-Fatiha)
-// These are used as voice samples so the user can hear each muezzin's recitation style
-const CDN = "https://cdn.islamic.network/quran/audio/128";
-
 const MUEZZINS: Muezzin[] = [
   // ── المسجد الحرام ─────────────────────────────────────────────────────────
   {
@@ -55,7 +50,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد الحرام",
     country: "مكة المكرمة 🇸🇦",
     emoji: "🕋",
-    audioUrl: `${CDN}/ar.mahermuaiqly/1.mp3`,
+    audioUrl: "/audio/adhan/haram-ali-mulla.mp3",
   },
   {
     id: "haram-khayat",
@@ -63,7 +58,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد الحرام",
     country: "مكة المكرمة 🇸🇦",
     emoji: "🕋",
-    audioUrl: `${CDN}/ar.mahermuaiqly/2.mp3`,
+    audioUrl: "/audio/adhan/haram-khayat.mp3",
   },
   {
     id: "haram-bilal",
@@ -71,7 +66,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد الحرام",
     country: "مكة المكرمة 🇸🇦",
     emoji: "🕋",
-    audioUrl: `${CDN}/ar.mahermuaiqly/3.mp3`,
+    audioUrl: "/audio/adhan/haram-bilal.mp3",
   },
   {
     id: "haram-dosari",
@@ -79,7 +74,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد الحرام",
     country: "مكة المكرمة 🇸🇦",
     emoji: "🕋",
-    audioUrl: `${CDN}/ar.alafasy/1.mp3`,
+    audioUrl: "/audio/adhan/haram-dosari.mp3",
   },
   {
     id: "haram-saleh",
@@ -87,7 +82,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد الحرام",
     country: "مكة المكرمة 🇸🇦",
     emoji: "🕋",
-    audioUrl: `${CDN}/ar.mahermuaiqly/4.mp3`,
+    audioUrl: "/audio/adhan/haram-saleh.mp3",
   },
   // ── المسجد النبوي ─────────────────────────────────────────────────────────
   {
@@ -96,7 +91,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد النبوي",
     country: "المدينة المنورة 🇸🇦",
     emoji: "🕌",
-    audioUrl: `${CDN}/ar.muhammadayyoub/1.mp3`,
+    audioUrl: "/audio/adhan/nabawi-juhani.mp3",
   },
   {
     id: "nabawi-hudhayfi",
@@ -104,7 +99,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد النبوي",
     country: "المدينة المنورة 🇸🇦",
     emoji: "🕌",
-    audioUrl: `${CDN}/ar.muhammadayyoub/2.mp3`,
+    audioUrl: "/audio/adhan/nabawi-hudhayfi.mp3",
   },
   {
     id: "nabawi-khalaf",
@@ -112,7 +107,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد النبوي",
     country: "المدينة المنورة 🇸🇦",
     emoji: "🕌",
-    audioUrl: `${CDN}/ar.muhammadayyoub/3.mp3`,
+    audioUrl: "/audio/adhan/nabawi-khalaf.mp3",
   },
   {
     id: "nabawi-qasim",
@@ -120,7 +115,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد النبوي",
     country: "المدينة المنورة 🇸🇦",
     emoji: "🕌",
-    audioUrl: `${CDN}/ar.muhammadayyoub/4.mp3`,
+    audioUrl: "/audio/adhan/nabawi-qasim.mp3",
   },
   // ── المسجد الأقصى ────────────────────────────────────────────────────────
   {
@@ -129,7 +124,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد الأقصى المبارك",
     country: "القدس الشريف 🇵🇸",
     emoji: "🏛️",
-    audioUrl: `${CDN}/ar.shaatree/1.mp3`,
+    audioUrl: "/audio/adhan/aqsa-mashmushi.mp3",
   },
   {
     id: "aqsa-khatib",
@@ -137,7 +132,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "المسجد الأقصى المبارك",
     country: "القدس الشريف 🇵🇸",
     emoji: "🏛️",
-    audioUrl: `${CDN}/ar.shaatree/2.mp3`,
+    audioUrl: "/audio/adhan/aqsa-khatib.mp3",
   },
   // ── مصر ──────────────────────────────────────────────────────────────────
   {
@@ -146,7 +141,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "مؤذن الإذاعة المصرية",
     country: "مصر 🇪🇬",
     emoji: "🎙️",
-    audioUrl: `${CDN}/ar.husary/1.mp3`,
+    audioUrl: "/audio/adhan/rafaat.mp3",
   },
   {
     id: "islam-sobhi",
@@ -154,7 +149,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "مؤذن بارز",
     country: "مصر 🇪🇬",
     emoji: "🎙️",
-    audioUrl: `${CDN}/ar.minshawi/1.mp3`,
+    audioUrl: "/audio/adhan/islam-sobhi.mp3",
   },
   // ── الكويت ───────────────────────────────────────────────────────────────
   {
@@ -163,7 +158,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "مؤذن بارز",
     country: "الكويت 🇰🇼",
     emoji: "🎙️",
-    audioUrl: `${CDN}/ar.alafasy/2.mp3`,
+    audioUrl: "/audio/adhan/afasy.mp3",
   },
   {
     id: "kanderi",
@@ -171,7 +166,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "مؤذن بارز",
     country: "الكويت 🇰🇼",
     emoji: "🎙️",
-    audioUrl: `${CDN}/ar.mahermuaiqly/5.mp3`,
+    audioUrl: "/audio/adhan/kanderi.mp3",
   },
   // ── العراق & الجزائر ──────────────────────────────────────────────────────
   {
@@ -180,7 +175,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "مؤذن بارز",
     country: "العراق 🇮🇶",
     emoji: "🎙️",
-    audioUrl: `${CDN}/ar.shaatree/3.mp3`,
+    audioUrl: "/audio/adhan/nofal.mp3",
   },
   {
     id: "haraka",
@@ -188,7 +183,7 @@ const MUEZZINS: Muezzin[] = [
     mosque: "مؤذن بارز",
     country: "الجزائر 🇩🇿",
     emoji: "🎙️",
-    audioUrl: `${CDN}/ar.shaatree/4.mp3`,
+    audioUrl: "/audio/adhan/haraka.mp3",
   },
 ];
 
@@ -410,6 +405,11 @@ export default function Adhan() {
   const playPreview = (muezzin: Muezzin) => {
     setAudioError("");
 
+    if (!muezzin.audioUrl) {
+      setAudioError("ملف الأذان غير متوفر حالياً");
+      return;
+    }
+
     // Stop any currently playing audio
     if (audioRef.current) {
       audioRef.current.pause();
@@ -441,7 +441,12 @@ export default function Adhan() {
     audio.onerror = () => {
       setPlayingId(null);
       setLoadingId(null);
-      setAudioError("ملف الصوت غير متوفر حالياً");
+      const mediaErr = audioRef.current?.error;
+      if (mediaErr && mediaErr.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+        setAudioError("ملف الأذان غير متوفر حالياً");
+      } else {
+        setAudioError("تعذّر تشغيل الأذان، يرجى المحاولة لاحقاً");
+      }
     };
 
     audio.src = muezzin.audioUrl;
@@ -458,7 +463,7 @@ export default function Adhan() {
         setPlayingId(null);
         const isAbort = err instanceof DOMException && err.name === "AbortError";
         if (!isAbort) {
-          setAudioError("تعذّر تشغيل الصوت، يرجى المحاولة مرة أخرى");
+          setAudioError("ملف الأذان غير متوفر حالياً");
         }
       });
   };
@@ -741,7 +746,7 @@ export default function Adhan() {
         <p className="text-xs text-muted-foreground mb-4">اختر الصوت الذي يؤثر فيك — اضغط ▶ للمعاينة</p>
 
         {audioError && (
-          <div className="mb-3 px-3 py-2 rounded-lg bg-destructive/10 text-destructive text-xs">{audioError}</div>
+          <div className="mb-3 px-3 py-2 rounded-lg bg-destructive/10 text-destructive text-xs" dir="rtl">{audioError}</div>
         )}
 
         <div className="space-y-2">
@@ -749,6 +754,7 @@ export default function Adhan() {
             const selected = prefs.muezzinId === m.id;
             const playing = playingId === m.id;
             const loading = loadingId === m.id;
+            const hasAudio = !!m.audioUrl;
             return (
               <div
                 key={m.id}
@@ -775,6 +781,9 @@ export default function Adhan() {
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm font-bold ${selected ? "text-primary" : "text-foreground"}`}>{m.name}</p>
                   <p className="text-xs text-muted-foreground truncate">{m.mosque} · {m.country}</p>
+                  {!hasAudio && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">ملف الأذان غير متوفر حالياً</p>
+                  )}
                 </div>
 
                 {selected && !playing && !loading && (
@@ -784,18 +793,29 @@ export default function Adhan() {
                 )}
 
                 <button
-                  onClick={(e) => { e.stopPropagation(); (playing || loading) ? stopAudio() : playPreview(m); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!hasAudio) { setAudioError("ملف الأذان غير متوفر حالياً"); return; }
+                    (playing || loading) ? stopAudio() : playPreview(m);
+                  }}
                   disabled={loading && !playing}
                   className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 ${
-                    playing
+                    !hasAudio
+                      ? "bg-muted/50 text-muted-foreground/40 cursor-not-allowed"
+                      : playing
                       ? "bg-primary text-primary-foreground shadow-md"
                       : loading
                       ? "bg-primary/20 text-primary"
                       : "bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary"
                   }`}
-                  title={playing ? "إيقاف" : loading ? "جاري التحميل..." : "استماع"}
+                  title={!hasAudio ? "ملف الأذان غير متوفر" : playing ? "إيقاف" : loading ? "جاري التحميل..." : "استماع"}
                 >
-                  {loading && !playing ? (
+                  {!hasAudio ? (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                      <line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
+                      <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23M12 20l.01 4M8 20h8"/>
+                    </svg>
+                  ) : loading && !playing ? (
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 animate-spin">
                       <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor"/>
                     </svg>

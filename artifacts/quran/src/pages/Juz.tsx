@@ -25,7 +25,7 @@ export default function JuzPage() {
           {juzList.map((juz) => {
             const firstSurahEntry = Object.entries(juz.verseMapping ?? {})[0];
             const firstSurahNum = firstSurahEntry ? parseInt(firstSurahEntry[0], 10) : null;
-            const firstVerseRange = firstSurahEntry ? firstSurahEntry[1] : null;
+            const firstVerseRange = firstSurahEntry ? String(firstSurahEntry[1]) : null;
 
             return (
               <div
@@ -38,7 +38,7 @@ export default function JuzPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground">الجزء {juz.juzNumber}</p>
-                    {firstSurahNum && firstVerseRange && typeof firstVerseRange === "string" && (
+                    {firstSurahNum && firstVerseRange && (
                       <p className="text-xs text-muted-foreground mt-0.5">
                         يبدأ من سورة {firstSurahNum} • آية {firstVerseRange.split("-")[0]}
                       </p>
