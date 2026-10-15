@@ -1,28 +1,14 @@
 import { Link } from "wouter";
-import {
-  useGetBookmarks,
-  getGetBookmarksQueryKey,
-  useDeleteBookmark,
-} from "@workspace/api-client-react";
 import { toast } from "sonner";
+import { useReadingStop } from "@/lib/userData";
 
 export default function Bookmarks() {
-  const { data: bookmarks, isLoading } = useGetBookmarks({
-    query: { queryKey: getGetBookmarksQueryKey() },
-  });
+  const { stop: latestStop, clearStop } = useReadingStop();
 
-  const deleteBookmark = useDeleteBookmark();
-
-  const handleDelete = (id: number) => {
-    deleteBookmark.mutate(
-      { id },
-      { onSuccess: () => toast.success("تمت إزالة علامة التوقف") }
-    );
+  const handleDelete = () => {
+    clearStop();
+    toast.success("تمت إزالة علامة التوقف");
   };
-
-  // Only the single latest stop matters
-  const sorted = bookmarks ? [...bookmarks].sort((a, b) => b.id - a.id) : [];
-  const latestStop = sorted[0] ?? null;
 
   return (
     <div className="page-enter max-w-2xl mx-auto px-4 py-6" dir="rtl">
@@ -33,11 +19,7 @@ export default function Bookmarks() {
         آخر مكان توقفت فيه أثناء القراءة
       </p>
 
-      {isLoading && (
-        <div className="skeleton h-44 rounded-2xl" />
-      )}
-
-      {!isLoading && !latestStop && (
+      {!latestStop && (
         <div className="text-center py-20">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" className="w-8 h-8 text-muted-foreground">
@@ -104,7 +86,7 @@ export default function Bookmarks() {
                 أكمل القراءة من هنا
               </Link>
               <button
-                onClick={() => handleDelete(latestStop.id)}
+                onClick={handleDelete}
                 className="px-4 py-3 rounded-xl bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors active:scale-95 flex items-center gap-1.5 text-sm font-medium"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4 h-4">

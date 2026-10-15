@@ -1,19 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import {
   useGetSurahVerses,
   getGetSurahVersesQueryKey,
   useListSurahs,
   getListSurahsQueryKey,
-  useUpdateReadingProgress,
-  useCreateBookmark,
-  useGetBookmarks,
-  getGetBookmarksQueryKey,
-  useDeleteBookmark,
-  useGetSettings,
-  getGetSettingsQueryKey,
-  useUpdateSettings,
 } from "@workspace/api-client-react";
+import { shouldShowBasmalahHeader } from "@workspace/quran-meta";
+import { recordProgress, useReaderSettings, useReadingStop } from "@/lib/userData";
 import TafsirPanel from "@/components/TafsirPanel";
 import { toast } from "sonner";
 import { copyToClipboard, formatAyahForCopy } from "@/lib/clipboard";
@@ -34,15 +28,11 @@ export default function Mushaf() {
   const [selectedVerse, setSelectedVerse] = useState<SelectedVerse | null>(null);
   const [tafsirOpen, setTafsirOpen] = useState(false);
   const [actionVerse, setActionVerse] = useState<SelectedVerse | null>(null);
-  const [fontSize, setFontSize] = useState(100);
   const [showTranslation, setShowTranslation] = useState(false);
 
   const { data: surahs } = useListSurahs({ query: { queryKey: getListSurahsQueryKey() } });
-  const { data: settings } = useGetSettings({ query: { queryKey: getGetSettingsQueryKey() } });
-
-  useEffect(() => {
-    if (settings?.fontSize) setFontSize(settings.fontSize);
-  }, [settings]);
+  const { settings, setFontSize } = useReaderSettings();
+  const fontSize = settings.fontSize;
 
   const { data: versesData, isLoading, isError } = useGetSurahVerses(
     surahNumber,
@@ -50,54 +40,33 @@ export default function Mushaf() {
     { query: { queryKey: getGetSurahVersesQueryKey(surahNumber, { page: 1, perPage: 286 }), enabled: surahNumber > 0 } }
   );
 
-  const { data: bookmarks } = useGetBookmarks({ query: { queryKey: getGetBookmarksQueryKey() } });
-  const updateProgress = useUpdateReadingProgress();
-  const createBookmark = useCreateBookmark();
-  const deleteBookmark = useDeleteBookmark();
-  const updateSettings = useUpdateSettings();
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const changeFontSize = (newSize: number) => {
-    setFontSize(newSize);
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      updateSettings.mutate({ data: { fontSize: newSize } });
-    }, 600);
-  };
+  const { isStopAt, setStop, clearStop } = useReadingStop();
+  const changeFontSize = setFontSize;
 
   const surah = versesData?.surah;
   const verses = versesData?.verses ?? [];
 
   useEffect(() => {
     if (surah) {
-      updateProgress.mutate({
-        data: {
-          lastPageNumber: surah.pageNumber,
-          lastSurahNumber: surahNumber,
-          lastVerseNumber: 1,
-          lastSurahName: surah.name,
-        },
+      recordProgress({
+        lastPageNumber: surah.pageNumber,
+        lastSurahNumber: surahNumber,
+        lastVerseNumber: 1,
+        lastSurahName: surah.name,
       });
     }
   }, [surahNumber, surah?.name]);
 
-  const isBookmarked = (verseNum: number) =>
-    bookmarks?.some((b) => b.surahNumber === surahNumber && b.verseNumber === verseNum) ?? false;
+  const isBookmarked = (verseNum: number) => isStopAt(surahNumber, verseNum);
 
   const toggleBookmark = (verse: SelectedVerse) => {
     if (!surah) return;
-    const existing = bookmarks?.find(
-      (b) => b.surahNumber === surahNumber && b.verseNumber === verse.verseNumber
-    );
-    if (existing) {
-      deleteBookmark.mutate({ id: existing.id }, {
-        onSuccess: () => toast.success("تمت إزالة العلامة"),
-      });
+    if (isStopAt(surahNumber, verse.verseNumber)) {
+      clearStop();
+      toast.success("تمت إزالة العلامة");
     } else {
-      createBookmark.mutate(
-        { data: { pageNumber: verse.pageNumber, surahNumber, verseNumber: verse.verseNumber, surahName: surah.name } },
-        { onSuccess: () => toast.success("✓ تم وضع علامة على الآية") }
-      );
+      setStop({ pageNumber: verse.pageNumber, surahNumber, verseNumber: verse.verseNumber, surahName: surah.name });
+      toast.success("✓ تم وضع علامة على الآية");
     }
   };
 
@@ -163,7 +132,7 @@ export default function Mushaf() {
           <p className="text-sm text-muted-foreground">
             {surah.nameSimple} • {surah.nameTranslation} • {surah.revelationType === "Meccan" ? "مكية" : "مدنية"} • {surah.versesCount} آية
           </p>
-          {surahNumber !== 9 && (
+          {shouldShowBasmalahHeader(surahNumber) && (
             <p className="font-quran text-xl text-primary/80 mt-3">بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</p>
           )}
         </div>

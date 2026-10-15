@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { createLocalStore, useLocalStore } from "@/lib/localStore";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -30,11 +31,33 @@ export interface PushPreferences {
   notifyDhikr: boolean;
 }
 
+/** Reminder times, "HH:MM" Saudi time. Kept on this device and sent with this browser's subscription. */
+export interface NotifTimes {
+  notifQuran1: string;
+  notifQuran2: string;
+  notifDhikr: string;
+}
+
+export const DEFAULT_NOTIF_TIMES: NotifTimes = { notifQuran1: "12:00", notifQuran2: "18:00", notifDhikr: "21:00" };
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export function parseNotifTimes(raw: unknown): NotifTimes | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const pick = (k: keyof NotifTimes) =>
+    typeof r[k] === "string" && TIME_RE.test(r[k] as string) ? (r[k] as string) : DEFAULT_NOTIF_TIMES[k];
+  return { notifQuran1: pick("notifQuran1"), notifQuran2: pick("notifQuran2"), notifDhikr: pick("notifDhikr") };
+}
+
+const notifTimesStore = createLocalStore<NotifTimes>("quran.notifTimes.v1", DEFAULT_NOTIF_TIMES, parseNotifTimes);
+
 export function usePushNotifications() {
   const [status, setStatus] = useState<NotificationStatus>("default");
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
   const [prefs, setPrefs] = useState<PushPreferences>({ notifyQuran: true, notifyDhikr: true });
   const [loading, setLoading] = useState(false);
+  const times = useLocalStore(notifTimesStore);
 
   // On native Capacitor, Web Push API is not applicable — local notifications handle prayer reminders
   const isNative = isCapacitorNative();
@@ -114,6 +137,7 @@ export function usePushNotifications() {
           keys: subJson.keys,
           notifyQuran: preferences.notifyQuran,
           notifyDhikr: preferences.notifyDhikr,
+          ...notifTimesStore.get(),
         }),
       });
 
@@ -159,5 +183,17 @@ export function usePushNotifications() {
     });
   }, [subscription]);
 
-  return { status, subscription, prefs, loading, isNative, isSupported, register, unsubscribe, updatePreferences };
+  const saveTimes = useCallback(async (newTimes: NotifTimes) => {
+    const parsed = parseNotifTimes(newTimes) ?? DEFAULT_NOTIF_TIMES;
+    notifTimesStore.set(parsed);
+    if (!subscription) return;
+    const res = await fetch(`${API_BASE}/api/push/times`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: subscription.endpoint, ...parsed }),
+    });
+    if (!res.ok) throw new Error(`Saving times failed: ${res.status}`);
+  }, [subscription]);
+
+  return { status, subscription, prefs, times, loading, isNative, isSupported, register, unsubscribe, updatePreferences, saveTimes };
 }

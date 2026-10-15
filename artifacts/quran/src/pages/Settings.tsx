@@ -1,15 +1,9 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
-import {
-  useGetSettings,
-  getGetSettingsQueryKey,
-  useUpdateSettings,
-} from "@workspace/api-client-react";
 import { toast } from "sonner";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { usePushNotifications, type NotifTimes } from "@/hooks/usePushNotifications";
 import { APP_CONFIG, isCapacitorNative, getCapacitorPlatform } from "@/lib/appConfig";
-
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+import { useReaderSettings } from "@/lib/userData";
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -20,12 +14,6 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
       <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${on ? "right-1" : "left-1"}`} />
     </button>
   );
-}
-
-interface NotifTimes {
-  notifQuran1: string;
-  notifQuran2: string;
-  notifDhikr: string;
 }
 
 function TimeInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
@@ -45,35 +33,29 @@ function TimeInput({ label, value, onChange }: { label: string; value: string; o
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
-  const { data: settings, isLoading } = useGetSettings({ query: { queryKey: getGetSettingsQueryKey() } });
-  const updateSettings = useUpdateSettings();
+  const { settings, setFontSize, setShowTafsir } = useReaderSettings();
   const push = usePushNotifications();
 
-  const [notifTimes, setNotifTimes] = useState<NotifTimes>({
-    notifQuran1: "12:00",
-    notifQuran2: "18:00",
-    notifDhikr: "21:00",
-  });
+  const [notifTimes, setNotifTimes] = useState<NotifTimes>(push.times);
   const [savingTimes, setSavingTimes] = useState(false);
 
   useEffect(() => {
-    fetch(`${BASE}/api/push/times`)
-      .then((r) => r.json())
-      .then((data: NotifTimes) => setNotifTimes(data))
-      .catch(() => {});
-  }, []);
+    setNotifTimes(push.times);
+  }, [push.times]);
 
   const handleTheme = (t: "light" | "dark") => {
     setTheme(t);
-    updateSettings.mutate({ data: { theme: t } }, { onSuccess: () => toast.success("تم حفظ الإعدادات") });
+    toast.success("تم حفظ الإعدادات");
   };
 
   const handleFontSize = (size: number) => {
-    updateSettings.mutate({ data: { fontSize: size } }, { onSuccess: () => toast.success("تم حفظ حجم الخط") });
+    setFontSize(size);
+    toast.success("تم حفظ حجم الخط");
   };
 
   const handleTafsir = (show: boolean) => {
-    updateSettings.mutate({ data: { showTafsir: show } }, { onSuccess: () => toast.success("تم حفظ الإعدادات") });
+    setShowTafsir(show);
+    toast.success("تم حفظ الإعدادات");
   };
 
   const handleTimeChange = (key: keyof NotifTimes, val: string) => {
@@ -83,11 +65,7 @@ export default function Settings() {
   const handleSaveTimes = async () => {
     setSavingTimes(true);
     try {
-      await fetch(`${BASE}/api/push/times`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(notifTimes),
-      });
+      await push.saveTimes(notifTimes);
       toast.success("تم حفظ مواعيد الإشعارات");
     } catch {
       toast.error("فشل حفظ المواعيد");
@@ -302,14 +280,6 @@ export default function Settings() {
             </div>
           )}
         </div>
-
-        {isLoading && (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="skeleton h-20 rounded-xl" />
-            ))}
-          </div>
-        )}
 
         {/* Share & Rate */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
