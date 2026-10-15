@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import * as adhan from "adhan";
 import { toast } from "sonner";
 import { useLocalNotifications } from "@/hooks/useLocalNotifications";
+import { ADHAN_PREFS_VERSION, DEFAULT_MADHAB, migrateAdhanPrefs } from "@/lib/adhanPrefs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ interface AdhanPrefs {
   calcMethod: string;
   madhab: string;
   reminderMinutes: number;
+  prefsVersion?: number;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -105,8 +107,9 @@ const DEFAULT_PREFS: AdhanPrefs = {
   enabledPrayers: ["fajr", "dhuhr", "asr", "maghrib", "isha"],
   snoozedUntil: null,
   calcMethod: "UmmAlQura",
-  madhab: "Hanafi",
+  madhab: DEFAULT_MADHAB,
   reminderMinutes: 0,
+  prefsVersion: ADHAN_PREFS_VERSION,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -114,7 +117,7 @@ const DEFAULT_PREFS: AdhanPrefs = {
 function loadPrefs(): AdhanPrefs {
   try {
     const s = localStorage.getItem("adhan_prefs");
-    if (s) return { ...DEFAULT_PREFS, ...JSON.parse(s) };
+    if (s) return migrateAdhanPrefs<AdhanPrefs>(JSON.parse(s), DEFAULT_PREFS);
   } catch {}
   return { ...DEFAULT_PREFS };
 }
