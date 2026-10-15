@@ -4,19 +4,18 @@ import type { PushSubscription } from "@workspace/db";
 const sendNotification = vi.fn();
 vi.mock("web-push", () => ({ default: { sendNotification, setVapidDetails: vi.fn() } }));
 vi.mock("./pushStore", () => ({
-  deleteSubscription: vi.fn(async () => {}),
+  deleteSubscriptionById: vi.fn(async () => {}),
   listSubscriptions: vi.fn(async () => []),
-  upsertSubscription: vi.fn(),
-  updateSubscription: vi.fn(),
 }));
 
 const store = await import("./pushStore");
 const { sendPush } = await import("../routes/push");
 const { dueReminders, ksaClock } = await import("./scheduler");
 
+let nextId = 1;
 function sub(endpoint: string, extra: Partial<PushSubscription> = {}): PushSubscription {
   return {
-    id: 1,
+    id: nextId++,
     endpoint,
     p256dh: "p",
     auth: "a",
@@ -26,6 +25,7 @@ function sub(endpoint: string, extra: Partial<PushSubscription> = {}): PushSubsc
     notifQuran1: "12:00",
     notifQuran2: "18:00",
     notifDhikr: "21:00",
+    manageTokenHash: "h",
     createdAt: new Date(),
     ...extra,
   };
@@ -37,13 +37,14 @@ describe("sendPush", () => {
       .mockResolvedValueOnce({})
       .mockRejectedValueOnce({ statusCode: 410 })
       .mockRejectedValueOnce({ statusCode: 500 });
-    const result = await sendPush([sub("https://a"), sub("https://b"), sub("https://c")], {
+    const b = sub("https://b");
+    const result = await sendPush([sub("https://a"), b, sub("https://c")], {
       title: "t",
       body: "b",
     });
     expect(sendNotification).toHaveBeenCalledTimes(3);
-    expect(store.deleteSubscription).toHaveBeenCalledTimes(1);
-    expect(store.deleteSubscription).toHaveBeenCalledWith("https://b");
+    expect(store.deleteSubscriptionById).toHaveBeenCalledTimes(1);
+    expect(store.deleteSubscriptionById).toHaveBeenCalledWith(b.id);
     expect(result).toEqual({ sent: 1, failed: 2, removed: 1 });
   });
 });

@@ -1,25 +1,38 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
+import { createHash, randomBytes } from "node:crypto";
 import webpush from "web-push";
 import { z } from "zod";
 import type { PushSubscription } from "@workspace/db";
 import {
-  deleteSubscription,
+  deleteSubscriptionById,
+  deleteSubscriptionByToken,
+  insertSubscription,
   listSubscriptions,
-  updateSubscription,
-  upsertSubscription,
+  updateSubscriptionByToken,
 } from "../lib/pushStore";
 import { writeLimiter } from "../lib/security";
+import { logger } from "../lib/logger";
+import { readVapidConfig } from "../lib/vapid";
+
+// Ownership model: POST /subscribe creates a subscription and returns a random
+// management token exactly once. Only its SHA-256 hash is stored. Every later
+// change or deletion must send that token as "Authorization: Bearer <token>".
+// The subscription endpoint URL is never used to authorize anything, and an
+// endpoint that is already registered can't be registered again.
 
 const router: IRouter = Router();
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:quran@app.com";
-
-const vapidConfigured = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
-if (vapidConfigured) {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY!, VAPID_PRIVATE_KEY!);
+const vapid = readVapidConfig();
+if (vapid.ok) {
+  webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
+  logger.info({ publicKeyFingerprint: vapid.publicKeyFingerprint }, "Web push enabled");
+} else if (vapid.reason === "leaked-key") {
+  logger.error("Web push disabled: the configured VAPID keys are the ones exposed in the repository. Rotate them in Replit Secrets.");
+} else {
+  logger.warn("Web push disabled: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are not set");
 }
+
+export const pushEnabled = vapid.ok;
 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM");
 
@@ -36,16 +49,12 @@ const SubscribeBody = z.object({
   notifDhikr: time.optional(),
 });
 
-const EndpointBody = z.object({ endpoint });
-
 const PreferencesBody = z.object({
-  endpoint,
   notifyQuran: z.boolean().optional(),
   notifyDhikr: z.boolean().optional(),
 });
 
 const TimesBody = z.object({
-  endpoint,
   notifQuran1: time.optional(),
   notifQuran2: time.optional(),
   notifDhikr: time.optional(),
@@ -55,33 +64,59 @@ function definedOnly<T extends Record<string, unknown>>(obj: T): Partial<T> {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Partial<T>;
 }
 
+export function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/** Hash of the bearer token, or null if the header is missing or malformed. */
+function bearerTokenHash(req: Request): string | null {
+  const m = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(req.get("authorization") ?? "");
+  return m ? hashToken(m[1]!) : null;
+}
+
+// Same response for "no token", "wrong token" and "no such subscription", so the
+// API reveals nothing about which subscriptions exist.
+const NOT_FOUND = { error: "Subscription not found" };
+
 // GET /api/push/vapid-public-key
 router.get("/vapid-public-key", (_req, res) => {
-  if (!vapidConfigured) {
+  if (!vapid.ok) {
     res.status(503).json({ error: "Push notifications are not configured" });
     return;
   }
-  res.json({ publicKey: VAPID_PUBLIC_KEY });
+  res.json({ publicKey: vapid.publicKey });
 });
 
 // POST /api/push/subscribe
 router.post("/subscribe", writeLimiter, async (req, res): Promise<void> => {
+  if (!vapid.ok) {
+    res.status(503).json({ error: "Push notifications are not configured" });
+    return;
+  }
   const parsed = SubscribeBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid subscription" });
     return;
   }
   const { endpoint, keys, notifyQuran, notifyDhikr, ...times } = parsed.data;
+  const manageToken = randomBytes(32).toString("base64url");
   try {
-    await upsertSubscription({
+    const created = await insertSubscription({
       endpoint,
       p256dh: keys.p256dh,
       auth: keys.auth,
       notifyQuran,
       notifyDhikr,
+      manageTokenHash: hashToken(manageToken),
       ...definedOnly(times),
     });
-    res.json({ ok: true });
+    if (!created) {
+      // Already registered. The browser should drop this subscription and
+      // create a new one (which gets a new endpoint).
+      res.status(409).json({ error: "Subscription already registered" });
+      return;
+    }
+    res.status(201).json({ ok: true, manageToken });
   } catch (err) {
     req.log.error({ err }, "Failed to save subscription");
     res.status(500).json({ error: "Failed to save subscription" });
@@ -90,19 +125,28 @@ router.post("/subscribe", writeLimiter, async (req, res): Promise<void> => {
 
 // DELETE /api/push/unsubscribe
 router.delete("/unsubscribe", writeLimiter, async (req, res): Promise<void> => {
-  const parsed = EndpointBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Missing endpoint" });
+  const tokenHash = bearerTokenHash(req);
+  if (!tokenHash) {
+    res.status(404).json(NOT_FOUND);
     return;
   }
   try {
-    await deleteSubscription(parsed.data.endpoint);
+    if (!(await deleteSubscriptionByToken(tokenHash))) {
+      res.status(404).json(NOT_FOUND);
+      return;
+    }
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Failed to unsubscribe");
     res.status(500).json({ error: "Failed to unsubscribe" });
   }
 });
+
+async function updateOwned(req: Request, changes: Record<string, unknown>) {
+  const tokenHash = bearerTokenHash(req);
+  if (!tokenHash) return false;
+  return updateSubscriptionByToken(tokenHash, changes);
+}
 
 // PUT /api/push/preferences
 router.put("/preferences", writeLimiter, async (req, res): Promise<void> => {
@@ -111,11 +155,9 @@ router.put("/preferences", writeLimiter, async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid preferences" });
     return;
   }
-  const { endpoint, ...changes } = parsed.data;
   try {
-    const found = await updateSubscription(endpoint, definedOnly(changes));
-    if (!found) {
-      res.status(404).json({ error: "Subscription not found" });
+    if (!(await updateOwned(req, definedOnly(parsed.data)))) {
+      res.status(404).json(NOT_FOUND);
       return;
     }
     res.json({ ok: true });
@@ -125,18 +167,16 @@ router.put("/preferences", writeLimiter, async (req, res): Promise<void> => {
   }
 });
 
-// PUT /api/push/times — reminder times for one subscription only.
+// PUT /api/push/times
 router.put("/times", writeLimiter, async (req, res): Promise<void> => {
   const parsed = TimesBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid times. Use HH:MM and include the subscription endpoint" });
+    res.status(400).json({ error: "Invalid times. Use HH:MM" });
     return;
   }
-  const { endpoint, ...times } = parsed.data;
   try {
-    const found = await updateSubscription(endpoint, definedOnly(times));
-    if (!found) {
-      res.status(404).json({ error: "Subscription not found" });
+    if (!(await updateOwned(req, definedOnly(parsed.data)))) {
+      res.status(404).json(NOT_FOUND);
       return;
     }
     res.json({ ok: true });
@@ -169,7 +209,7 @@ export async function sendPush(
     if (r.status !== "rejected") continue;
     const status = (r.reason as { statusCode?: number } | undefined)?.statusCode;
     if (status === 404 || status === 410) {
-      await deleteSubscription(subs[i]!.endpoint);
+      await deleteSubscriptionById(subs[i]!.id);
       removed++;
     }
   }

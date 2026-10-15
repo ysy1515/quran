@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import type { PushSubscription } from "@workspace/db";
-import { listSubscriptions, sendPush, type PushPayload } from "../routes/push.js";
+import { listSubscriptions, pushEnabled, sendPush, type PushPayload } from "../routes/push.js";
 import { logger } from "./logger.js";
 
 // Reminder times are stored per subscription as "HH:MM" Saudi time (UTC+3).
@@ -66,6 +66,10 @@ export async function runSchedulerTick(now: Date = new Date()): Promise<void> {
 }
 
 export function startScheduler() {
+  if (!pushEnabled) {
+    logger.warn("Push reminder scheduler not started: web push is disabled");
+    return;
+  }
   cron.schedule("* * * * *", async () => {
     try {
       await runSchedulerTick();

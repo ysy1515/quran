@@ -1,9 +1,9 @@
 import { db, pushSubscriptionsTable, type PushSubscription } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, isNotNull } from "drizzle-orm";
 
-// All database access for web push subscriptions. Every write is keyed by the
-// subscription endpoint, an unguessable URL issued by the browser's push service,
-// so a caller can only change the subscription it owns.
+// All database access for web push subscriptions. A subscription is created once
+// and afterwards found only by the hash of its secret management token, so
+// knowing a subscription's endpoint URL gives no way to change or delete it.
 
 export type ReminderTimes = {
   notifQuran1: string;
@@ -17,33 +17,54 @@ export type NewSubscription = {
   auth: string;
   notifyQuran: boolean;
   notifyDhikr: boolean;
+  manageTokenHash: string;
 } & Partial<ReminderTimes>;
 
-export async function upsertSubscription(sub: NewSubscription): Promise<void> {
-  const { endpoint, ...rest } = sub;
-  await db
+export type SubscriptionChanges = Partial<Pick<PushSubscription, "notifyQuran" | "notifyDhikr"> & ReminderTimes>;
+
+/** Inserts a new subscription. Returns false if the endpoint is already registered. */
+export async function insertSubscription(sub: NewSubscription): Promise<boolean> {
+  const inserted = await db
     .insert(pushSubscriptionsTable)
     .values(sub)
-    .onConflictDoUpdate({ target: pushSubscriptionsTable.endpoint, set: rest });
+    .onConflictDoNothing({ target: pushSubscriptionsTable.endpoint })
+    .returning({ id: pushSubscriptionsTable.id });
+  return inserted.length > 0;
 }
 
-export async function deleteSubscription(endpoint: string): Promise<void> {
-  await db.delete(pushSubscriptionsTable).where(eq(pushSubscriptionsTable.endpoint, endpoint));
-}
-
-/** Returns false when no subscription exists for this endpoint. */
-export async function updateSubscription(
-  endpoint: string,
-  changes: Partial<Pick<PushSubscription, "notifyQuran" | "notifyDhikr"> & ReminderTimes>,
-): Promise<boolean> {
+/** Updates the subscription owning this token hash. Returns false if none. */
+export async function updateSubscriptionByToken(tokenHash: string, changes: SubscriptionChanges): Promise<boolean> {
+  if (Object.keys(changes).length === 0) {
+    const found = await db
+      .select({ id: pushSubscriptionsTable.id })
+      .from(pushSubscriptionsTable)
+      .where(eq(pushSubscriptionsTable.manageTokenHash, tokenHash))
+      .limit(1);
+    return found.length > 0;
+  }
   const updated = await db
     .update(pushSubscriptionsTable)
     .set(changes)
-    .where(eq(pushSubscriptionsTable.endpoint, endpoint))
+    .where(eq(pushSubscriptionsTable.manageTokenHash, tokenHash))
     .returning({ id: pushSubscriptionsTable.id });
   return updated.length > 0;
 }
 
+/** Deletes the subscription owning this token hash. Returns false if none. */
+export async function deleteSubscriptionByToken(tokenHash: string): Promise<boolean> {
+  const deleted = await db
+    .delete(pushSubscriptionsTable)
+    .where(eq(pushSubscriptionsTable.manageTokenHash, tokenHash))
+    .returning({ id: pushSubscriptionsTable.id });
+  return deleted.length > 0;
+}
+
+/** Server-side cleanup when the push service reports a subscription as gone. */
+export async function deleteSubscriptionById(id: number): Promise<void> {
+  await db.delete(pushSubscriptionsTable).where(eq(pushSubscriptionsTable.id, id));
+}
+
+/** Subscriptions eligible for sending: only those created with a management token. */
 export async function listSubscriptions(): Promise<PushSubscription[]> {
-  return db.select().from(pushSubscriptionsTable);
+  return db.select().from(pushSubscriptionsTable).where(isNotNull(pushSubscriptionsTable.manageTokenHash));
 }

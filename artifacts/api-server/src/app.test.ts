@@ -1,30 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
+import webpush from "web-push";
+
+// Fresh throwaway keys for the test run only.
+const keys = webpush.generateVAPIDKeys();
+process.env.VAPID_PUBLIC_KEY = keys.publicKey;
+process.env.VAPID_PRIVATE_KEY = keys.privateKey;
 
 vi.mock("./lib/pushStore", () => ({
-  upsertSubscription: vi.fn(async () => {}),
-  deleteSubscription: vi.fn(async () => {}),
-  updateSubscription: vi.fn(async () => true),
+  insertSubscription: vi.fn(async () => true),
+  updateSubscriptionByToken: vi.fn(async () => true),
+  deleteSubscriptionByToken: vi.fn(async () => true),
+  deleteSubscriptionById: vi.fn(async () => {}),
   listSubscriptions: vi.fn(async () => []),
 }));
 
 const store = await import("./lib/pushStore");
+const { hashToken } = await import("./routes/push");
 const { default: app } = await import("./app");
 
 const ENDPOINT = "https://fcm.googleapis.com/fcm/send/abc123";
+const SUB = { endpoint: ENDPOINT, keys: { p256dh: "p", auth: "a" } };
+const TOKEN = "A".repeat(43);
 
 beforeEach(() => vi.clearAllMocks());
 
-describe("shared personal-data endpoints are gone", () => {
+describe("legacy shared-data endpoints", () => {
   it.each([
-    ["get", "/api/bookmarks"],
-    ["post", "/api/bookmarks"],
-    ["delete", "/api/bookmarks/1"],
-    ["get", "/api/reading-progress"],
-    ["put", "/api/reading-progress"],
-    ["get", "/api/settings"],
-    ["put", "/api/settings"],
-    ["get", "/api/stats"],
     ["get", "/api/push/times"],
     ["post", "/api/notifications/register-device"],
     ["post", "/api/notifications/update-preferences"],
@@ -35,30 +37,88 @@ describe("shared personal-data endpoints are gone", () => {
   });
 });
 
-describe("push routes only touch the caller's own subscription", () => {
-  it("rejects time changes without an endpoint", async () => {
-    const res = await request(app).put("/api/push/times").send({ notifQuran1: "05:00" });
-    expect(res.status).toBe(400);
-    expect(store.updateSubscription).not.toHaveBeenCalled();
+describe("push subscription ownership", () => {
+  it("returns a management token once and stores only its hash", async () => {
+    const res = await request(app).post("/api/push/subscribe").send({ ...SUB, notifyDhikr: false });
+    expect(res.status).toBe(201);
+    const token = res.body.manageToken as string;
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(store.insertSubscription).toHaveBeenCalledWith({
+      endpoint: ENDPOINT,
+      p256dh: "p",
+      auth: "a",
+      notifyQuran: true,
+      notifyDhikr: false,
+      manageTokenHash: hashToken(token),
+    });
+    const stored = vi.mocked(store.insertSubscription).mock.calls[0]![0];
+    expect(JSON.stringify(stored)).not.toContain(token);
+  });
+
+  it("issues a different token for every subscription", async () => {
+    const a = await request(app).post("/api/push/subscribe").send(SUB);
+    const b = await request(app).post("/api/push/subscribe").send({ ...SUB, endpoint: ENDPOINT + "x" });
+    expect(a.body.manageToken).not.toBe(b.body.manageToken);
+  });
+
+  it("refuses to re-register an existing endpoint (no overwrite by endpoint)", async () => {
+    vi.mocked(store.insertSubscription).mockResolvedValueOnce(false);
+    const res = await request(app).post("/api/push/subscribe").send(SUB);
+    expect(res.status).toBe(409);
+    expect(res.body.manageToken).toBeUndefined();
+  });
+
+  it.each([
+    ["put", "/api/push/times", { endpoint: ENDPOINT, notifQuran1: "05:00" }],
+    ["put", "/api/push/preferences", { endpoint: ENDPOINT, notifyQuran: false }],
+    ["delete", "/api/push/unsubscribe", { endpoint: ENDPOINT }],
+  ] as const)("%s %s with only the endpoint is refused and touches nothing", async (method, path, body) => {
+    const res = await request(app)[method](path).send(body);
+    expect(res.status).toBe(404);
+    expect(store.updateSubscriptionByToken).not.toHaveBeenCalled();
+    expect(store.deleteSubscriptionByToken).not.toHaveBeenCalled();
+  });
+
+  it("refuses a malformed bearer token without a lookup", async () => {
+    const res = await request(app)
+      .put("/api/push/times")
+      .set("Authorization", "Bearer short")
+      .send({ notifQuran1: "05:00" });
+    expect(res.status).toBe(404);
+    expect(store.updateSubscriptionByToken).not.toHaveBeenCalled();
+  });
+
+  it("refuses a well-formed but unknown token with the same response", async () => {
+    vi.mocked(store.updateSubscriptionByToken).mockResolvedValueOnce(false);
+    const res = await request(app)
+      .put("/api/push/times")
+      .set("Authorization", `Bearer ${TOKEN}`)
+      .send({ notifQuran1: "05:00" });
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: "Subscription not found" });
+  });
+
+  it("updates times only through the token's hash, ignoring any endpoint in the body", async () => {
+    const res = await request(app)
+      .put("/api/push/times")
+      .set("Authorization", `Bearer ${TOKEN}`)
+      .send({ endpoint: "https://someone-else.example/x", notifQuran1: "05:30" });
+    expect(res.status).toBe(200);
+    expect(store.updateSubscriptionByToken).toHaveBeenCalledWith(hashToken(TOKEN), { notifQuran1: "05:30" });
+  });
+
+  it("deletes only with the token", async () => {
+    const res = await request(app).delete("/api/push/unsubscribe").set("Authorization", `Bearer ${TOKEN}`);
+    expect(res.status).toBe(200);
+    expect(store.deleteSubscriptionByToken).toHaveBeenCalledWith(hashToken(TOKEN));
   });
 
   it("rejects malformed times", async () => {
-    const res = await request(app).put("/api/push/times").send({ endpoint: ENDPOINT, notifQuran1: "25:00" });
-    expect(res.status).toBe(400);
-  });
-
-  it("updates only the given subscription", async () => {
     const res = await request(app)
       .put("/api/push/times")
-      .send({ endpoint: ENDPOINT, notifQuran1: "05:30" });
-    expect(res.status).toBe(200);
-    expect(store.updateSubscription).toHaveBeenCalledWith(ENDPOINT, { notifQuran1: "05:30" });
-  });
-
-  it("returns 404 for an unknown subscription", async () => {
-    vi.mocked(store.updateSubscription).mockResolvedValueOnce(false);
-    const res = await request(app).put("/api/push/preferences").send({ endpoint: ENDPOINT, notifyQuran: false });
-    expect(res.status).toBe(404);
+      .set("Authorization", `Bearer ${TOKEN}`)
+      .send({ notifQuran1: "25:00" });
+    expect(res.status).toBe(400);
   });
 
   it("rejects non-https endpoints on subscribe", async () => {
@@ -66,32 +126,19 @@ describe("push routes only touch the caller's own subscription", () => {
       .post("/api/push/subscribe")
       .send({ endpoint: "http://evil.example/x", keys: { p256dh: "a", auth: "b" } });
     expect(res.status).toBe(400);
-    expect(store.upsertSubscription).not.toHaveBeenCalled();
+    expect(store.insertSubscription).not.toHaveBeenCalled();
   });
 
-  it("stores a valid subscription", async () => {
-    const res = await request(app)
-      .post("/api/push/subscribe")
-      .send({ endpoint: ENDPOINT, keys: { p256dh: "p", auth: "a" }, notifyDhikr: false });
-    expect(res.status).toBe(200);
-    expect(store.upsertSubscription).toHaveBeenCalledWith({
-      endpoint: ENDPOINT,
-      p256dh: "p",
-      auth: "a",
-      notifyQuran: true,
-      notifyDhikr: false,
-    });
-  });
-
-  it("reports push as unconfigured when VAPID secrets are missing", async () => {
+  it("serves the configured public key", async () => {
     const res = await request(app).get("/api/push/vapid-public-key");
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(200);
+    expect(res.body.publicKey).toBe(keys.publicKey);
   });
 
   it("rate-limits repeated writes", async () => {
     let last = 0;
     for (let i = 0; i < 35; i++) {
-      last = (await request(app).delete("/api/push/unsubscribe").send({ endpoint: ENDPOINT })).status;
+      last = (await request(app).delete("/api/push/unsubscribe").set("Authorization", `Bearer ${TOKEN}`)).status;
     }
     expect(last).toBe(429);
   });
