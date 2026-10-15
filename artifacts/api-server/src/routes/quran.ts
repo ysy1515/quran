@@ -257,16 +257,10 @@ router.get(
 
     // Fetch from Quran.com API
     try {
-      const [tafsirResp, verseResp] = await Promise.all([
-        fetchWithTimeout(
-          `${QURAN_API_BASE}/tafsirs/${tafsirId}/by_ayah/${verseKey}`,
-          { headers: { Accept: "application/json" } }
-        ),
-        fetchWithTimeout(
-          `${QURAN_API_BASE}/verses/by_key/${verseKey}?language=ar&fields=text_uthmani`,
-          { headers: { Accept: "application/json" } }
-        ),
-      ]);
+      const tafsirResp = await fetchWithTimeout(
+        `${QURAN_API_BASE}/tafsirs/${tafsirId}/by_ayah/${verseKey}`,
+        { headers: { Accept: "application/json" } }
+      );
 
       if (!tafsirResp.ok) {
         if (tafsirResp.status === 404) {

@@ -81,7 +81,7 @@ export default function Dhikr() {
         }
         if (s.target) setTarget(s.target);
         if (s.sessions) setSessions(s.sessions);
-      } catch {}
+      } catch { /* corrupt saved state: keep defaults */ }
     }
   }, []);
 

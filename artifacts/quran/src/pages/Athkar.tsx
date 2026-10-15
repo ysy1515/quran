@@ -127,7 +127,6 @@ export default function Athkar() {
 
   const filtered = useMemo(() => {
     if (!search.trim()) return ATHKAR_CATEGORIES;
-    const q = search.toLowerCase();
     return ATHKAR_CATEGORIES.filter(
       (c) =>
         c.title.includes(search) ||

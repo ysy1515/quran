@@ -35,15 +35,6 @@ interface AdhanPrefs {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PRAYER_LABELS: Record<string, string> = {
-  fajr: "الفجر",
-  sunrise: "الشروق",
-  dhuhr: "الظهر",
-  asr: "العصر",
-  maghrib: "المغرب",
-  isha: "العشاء",
-};
-
 // Only the 5 MP3 files actually uploaded to public/audio/adhan/
 const MUEZZINS: Muezzin[] = [
   {
@@ -118,7 +109,7 @@ function loadPrefs(): AdhanPrefs {
   try {
     const s = localStorage.getItem("adhan_prefs");
     if (s) return migrateAdhanPrefs<AdhanPrefs>(JSON.parse(s), DEFAULT_PREFS);
-  } catch {}
+  } catch { /* corrupt saved data: keep defaults */ }
   return { ...DEFAULT_PREFS };
 }
 
@@ -243,7 +234,7 @@ export default function Adhan() {
             setLocationName([city, country].filter(Boolean).join("، "));
           })
           .catch(() => setLocationName(`${lat.toFixed(2)}°، ${lng.toFixed(2)}°`));
-      } catch {}
+      } catch { /* corrupt saved data: keep defaults */ }
     }
   }, []);
 
@@ -419,7 +410,6 @@ export default function Adhan() {
   };
 
   const snoozed = isSnoozed(prefs.snoozedUntil);
-  const selectedMuezzin = MUEZZINS.find((m) => m.id === prefs.muezzinId) ?? MUEZZINS[0];
 
   return (
     <div className="page-enter max-w-xl mx-auto px-4 py-6" dir="rtl">
@@ -698,7 +688,8 @@ export default function Adhan() {
                   onClick={(e) => {
                     e.stopPropagation();
                     if (!hasAudio) { setAudioError("ملف الأذان غير متوفر حالياً"); return; }
-                    (playing || loading) ? stopAudio() : playPreview(m);
+                    if (playing || loading) stopAudio();
+                    else playPreview(m);
                   }}
                   disabled={loading && !playing}
                   className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 ${

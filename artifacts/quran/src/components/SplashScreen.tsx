@@ -18,8 +18,6 @@ function IslamicOrnament({ className }: { className?: string }) {
         const angle = (i * 45 * Math.PI) / 180;
         const x1 = 100 + 70 * Math.cos(angle);
         const y1 = 100 + 70 * Math.sin(angle);
-        const x2 = 100 + 70 * Math.cos(angle + (22.5 * Math.PI) / 180);
-        const y2 = 100 + 70 * Math.sin(angle + (22.5 * Math.PI) / 180);
         return (
           <line key={i} x1="100" y1="100" x2={x1} y2={y1} stroke="currentColor" strokeWidth="0.75" opacity="0.25" />
         );

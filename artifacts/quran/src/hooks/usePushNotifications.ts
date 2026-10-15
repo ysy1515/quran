@@ -85,7 +85,7 @@ export function usePushNotifications() {
     // Load saved prefs from localStorage
     const saved = localStorage.getItem("push-prefs");
     if (saved) {
-      try { setPrefs(JSON.parse(saved) as PushPreferences); } catch {}
+      try { setPrefs(JSON.parse(saved) as PushPreferences); } catch { /* corrupt saved prefs: keep defaults */ }
     }
 
     // Check current state

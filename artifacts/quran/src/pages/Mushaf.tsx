@@ -55,7 +55,7 @@ export default function Mushaf() {
         lastSurahName: surah.name,
       });
     }
-  }, [surahNumber, surah?.name]);
+  }, [surahNumber, surah]);
 
   const isBookmarked = (verseNum: number) => isStopAt(surahNumber, verseNum);
 

@@ -114,7 +114,7 @@ export function useLocalNotifications() {
       if (prayerNotifs.length > 0) {
         await LocalNotifications.cancel({ notifications: prayerNotifs.map((n) => ({ id: n.id })) });
       }
-    } catch {}
+    } catch { /* nothing pending to cancel */ }
   }, []);
 
   const schedulePrayers = useCallback(
