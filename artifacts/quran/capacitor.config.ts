@@ -21,9 +21,6 @@ const config: CapacitorConfig = {
       iconColor: "#1a4731",
       sound: "default",
     },
-    PushNotifications: {
-      presentationOptions: ["badge", "sound", "alert"],
-    },
   },
   android: {
     backgroundColor: "#1a4731",

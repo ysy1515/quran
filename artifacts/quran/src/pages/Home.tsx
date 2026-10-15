@@ -1,12 +1,9 @@
 import { Link } from "wouter";
 import {
-  useGetReadingProgress,
-  getGetReadingProgressQueryKey,
-  useGetReadingStats,
-  getGetReadingStatsQueryKey,
   useListSurahs,
   getListSurahsQueryKey,
 } from "@workspace/api-client-react";
+import { readingStats, useReadingProgress } from "@/lib/userData";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -36,13 +33,8 @@ function QuickSurah({ number, name, versesCount }: { number: number; name: strin
 }
 
 export default function Home() {
-  const { data: progress } = useGetReadingProgress({
-    query: { queryKey: getGetReadingProgressQueryKey() },
-  });
-
-  const { data: stats } = useGetReadingStats({
-    query: { queryKey: getGetReadingStatsQueryKey() },
-  });
+  const progress = useReadingProgress();
+  const stats = readingStats(progress);
 
   const { data: surahs } = useListSurahs({
     query: { queryKey: getListSurahsQueryKey() },

@@ -1,87 +1,82 @@
 import cron from "node-cron";
-import { sendPushToAll } from "../routes/push.js";
+import type { PushSubscription } from "@workspace/db";
+import { listSubscriptions, pushEnabled, sendPush, type PushPayload } from "../routes/push.js";
 import { logger } from "./logger.js";
-import { db } from "@workspace/db";
-import { appSettingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
 
-// Read current notification times from DB (KSA = UTC+3)
-async function getNotifTimes() {
-  try {
-    const [s] = await db
-      .select()
-      .from(appSettingsTable)
-      .where(eq(appSettingsTable.sessionId, "default"))
-      .limit(1);
-    return {
-      quran1: s?.notifQuran1 ?? "12:00",
-      quran2: s?.notifQuran2 ?? "18:00",
-      dhikr: s?.notifDhikr ?? "21:00",
-    };
-  } catch {
-    return { quran1: "12:00", quran2: "18:00", dhikr: "21:00" };
+// Reminder times are stored per subscription as "HH:MM" Saudi time (UTC+3).
+const KSA_OFFSET_HOURS = 3;
+
+/** Converts a UTC Date to the "HH:MM" string it shows in Saudi Arabia. */
+export function ksaClock(now: Date): string {
+  const h = (now.getUTCHours() + KSA_OFFSET_HOURS) % 24;
+  const m = now.getUTCMinutes();
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+type Reminder = {
+  key: "quran1" | "quran2" | "dhikr";
+  due: (s: PushSubscription, clock: string) => boolean;
+  payload: PushPayload;
+};
+
+const REMINDERS: Reminder[] = [
+  {
+    key: "quran1",
+    due: (s, clock) => s.notifyQuran && s.notifQuran1 === clock,
+    payload: {
+      title: "📖 حان وقت الورد",
+      body: "لا تنسَ ورد القرآن — خصص 10 دقائق لتلاوة كلام الله",
+      tag: "quran-1",
+    },
+  },
+  {
+    key: "quran2",
+    due: (s, clock) => s.notifyQuran && s.notifQuran2 === clock,
+    payload: {
+      title: "🌅 ورد المساء",
+      body: "اجعل لك نصيباً من كتاب الله — ورد المساء ينتظرك",
+      tag: "quran-2",
+    },
+  },
+  {
+    key: "dhikr",
+    due: (s, clock) => s.notifyDhikr && s.notifDhikr === clock,
+    payload: {
+      title: "📿 أذكار المساء",
+      body: "«مَن قَالَ سُبحانَ اللهِ وبِحَمدِهِ مائةَ مرةٍ حُطَّت عنه خطاياه» — سبّح الآن",
+      tag: "dhikr",
+    },
+  },
+];
+
+/** Which subscribers are due for which reminder at this minute. */
+export function dueReminders(subs: PushSubscription[], now: Date) {
+  const clock = ksaClock(now);
+  return REMINDERS.map((r) => ({ reminder: r, subs: subs.filter((s) => r.due(s, clock)) })).filter(
+    (x) => x.subs.length > 0,
+  );
+}
+
+export async function runSchedulerTick(now: Date = new Date()): Promise<void> {
+  const subs = await listSubscriptions();
+  for (const { reminder, subs: targets } of dueReminders(subs, now)) {
+    const result = await sendPush(targets, reminder.payload);
+    logger.info({ result, reminder: reminder.key }, "Reminder sent");
   }
 }
 
-// Convert KSA time "HH:MM" to UTC "HH:MM" (subtract 3 hours)
-function ksaToUtc(ksaTime: string): { h: number; m: number } {
-  const [hStr, mStr] = ksaTime.split(":");
-  let h = parseInt(hStr, 10) - 3;
-  const m = parseInt(mStr, 10);
-  if (h < 0) h += 24;
-  return { h, m };
-}
-
 export function startScheduler() {
-  // Run every minute — check if current UTC time matches any notification time
+  if (!pushEnabled) {
+    logger.warn("Push reminder scheduler not started: web push is disabled");
+    return;
+  }
   cron.schedule("* * * * *", async () => {
     try {
-      const now = new Date();
-      const utcH = now.getUTCHours();
-      const utcM = now.getUTCMinutes();
-
-      const times = await getNotifTimes();
-
-      const quran1 = ksaToUtc(times.quran1);
-      const quran2 = ksaToUtc(times.quran2);
-      const dhikr  = ksaToUtc(times.dhikr);
-
-      if (utcH === quran1.h && utcM === quran1.m) {
-        const result = await sendPushToAll("quran", {
-          title: "📖 حان وقت الورد",
-          body: "لا تنسَ ورد القرآن — خصص 10 دقائق لتلاوة كلام الله",
-          icon: "/icons/icon-192.png",
-          badge: "/icons/badge-72.png",
-          tag: "quran-1",
-        });
-        logger.info({ result, time: times.quran1 }, "Quran reminder 1 sent");
-      }
-
-      if (utcH === quran2.h && utcM === quran2.m) {
-        const result = await sendPushToAll("quran", {
-          title: "🌅 ورد المساء",
-          body: "اجعل لك نصيباً من كتاب الله — ورد المساء ينتظرك",
-          icon: "/icons/icon-192.png",
-          badge: "/icons/badge-72.png",
-          tag: "quran-2",
-        });
-        logger.info({ result, time: times.quran2 }, "Quran reminder 2 sent");
-      }
-
-      if (utcH === dhikr.h && utcM === dhikr.m) {
-        const result = await sendPushToAll("dhikr", {
-          title: "📿 أذكار المساء",
-          body: "«مَن قَالَ سُبحانَ اللهِ وبِحَمدِهِ مائةَ مرةٍ حُطَّت عنه خطاياه» — سبّح الآن",
-          icon: "/icons/icon-192.png",
-          badge: "/icons/badge-72.png",
-          tag: "dhikr",
-        });
-        logger.info({ result, time: times.dhikr }, "Dhikr reminder sent");
-      }
+      await runSchedulerTick();
     } catch (err) {
-      logger.error(err, "Scheduler error");
+      logger.error({ err }, "Scheduler error");
     }
   });
 
-  logger.info("Push notification scheduler started (checks every minute, reads times from DB)");
+  logger.info("Push notification scheduler started (per-subscriber times, checked every minute)");
 }

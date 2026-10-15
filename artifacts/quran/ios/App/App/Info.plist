@@ -4,8 +4,6 @@
 <dict>
     <key>CAPACITOR_DEBUG</key>
         <string>$(CAPACITOR_DEBUG)</string>
-        <key>CFBundleDevelopmentRegion</key>
-        <string>en</string>
         <key>CFBundleDisplayName</key>
         <string>القرآن الكريم</string>
         <key>CFBundleExecutable</key>

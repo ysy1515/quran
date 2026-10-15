@@ -9,10 +9,14 @@ import {
 } from "@workspace/api-zod";
 import { db, tafsirCacheTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
+import { ayahCount, isValidAyah, isValidSurah } from "@workspace/quran-meta";
 
 const QURAN_API_BASE =
   process.env.QURAN_API_BASE ?? "https://api.quran.com/api/v4";
 const TAFSIR_ID_DEFAULT = 14; // Ibn Kathir Arabic (14 = Arabic, 169 = English abridged)
+// Tafsir editions the app offers; other ids are refused so the cache table only
+// holds content the app can show.
+const ALLOWED_TAFSIR_IDS = new Set([14, 169]);
 const FETCH_TIMEOUT_MS = 12000; // 12 seconds
 
 function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
@@ -67,61 +71,97 @@ router.get("/surahs", async (req, res): Promise<void> => {
   }
 });
 
+type UpstreamVerse = {
+  id: number;
+  verse_key: string;
+  verse_number: number;
+  text_uthmani: string;
+  page_number: number;
+  juz_number: number;
+  hizb_number: number;
+  translations?: Array<{ text: string; resource_id: number }>;
+};
+
+// Quran.com documents a maximum of 50 records per request. Fetching in pages of
+// 50 works whether or not that limit is enforced.
+const UPSTREAM_PAGE_SIZE = 50;
+
+export class IncompleteSurahError extends Error {}
+
+/**
+ * Fetches every ayah of a surah from Quran.com and checks that the result is
+ * exactly ayat 1..N in order, where N comes from the reference table. The Arabic
+ * text is returned exactly as received.
+ */
+export async function fetchCompleteSurah(
+  surah: number,
+  fetchFn: (url: string) => Promise<Response> = (url) =>
+    fetchWithTimeout(url, { headers: { Accept: "application/json" } }),
+): Promise<UpstreamVerse[]> {
+  const expected = ayahCount(surah);
+  const pages = Math.ceil(expected / UPSTREAM_PAGE_SIZE);
+  const responses = await Promise.all(
+    Array.from({ length: pages }, (_, i) =>
+      fetchFn(
+        `${QURAN_API_BASE}/verses/by_chapter/${surah}?language=ar&words=false&page=${i + 1}&per_page=${UPSTREAM_PAGE_SIZE}&fields=text_uthmani,page_number,juz_number,hizb_number&translations=20`,
+      ),
+    ),
+  );
+  const verses: UpstreamVerse[] = [];
+  for (const resp of responses) {
+    if (!resp.ok) throw new Error(`Quran.com responded ${resp.status}`);
+    const data = (await resp.json()) as { verses: UpstreamVerse[] };
+    verses.push(...data.verses);
+  }
+
+  const ok =
+    verses.length === expected &&
+    verses.every((v, i) => v.verse_number === i + 1 && v.verse_key === `${surah}:${i + 1}`);
+  if (!ok) {
+    throw new IncompleteSurahError(
+      `Surah ${surah}: expected ayat 1..${expected}, received ${verses.length}`,
+    );
+  }
+  return verses;
+}
+
 // Get verses for a surah
 router.get("/surahs/:number/verses", async (req, res): Promise<void> => {
   const params = GetSurahVersesParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
+  if (!params.success || !isValidSurah(params.data.number)) {
+    res.status(400).json({ error: "Invalid surah number" });
     return;
   }
 
   const query = GetSurahVersesQueryParams.safeParse(req.query);
-  const page = query.success ? query.data.page : 1;
-  const perPage = query.success ? query.data.perPage : 50;
+  const page = query.success ? Math.max(1, query.data.page ?? 1) : 1;
+  const perPage = query.success ? Math.max(1, query.data.perPage ?? 50) : 50;
 
   try {
-    const [versesResp, chapterResp] = await Promise.all([
-      fetchWithTimeout(
-        `${QURAN_API_BASE}/verses/by_chapter/${params.data.number}?language=ar&words=false&page=${page}&per_page=${perPage}&fields=text_uthmani,page_number,juz_number,hizb_number&translations=20`,
-        { headers: { Accept: "application/json" } }
-      ),
+    const [allVerses, chapterResp] = await Promise.all([
+      fetchCompleteSurah(params.data.number),
       fetchWithTimeout(
         `${QURAN_API_BASE}/chapters/${params.data.number}?language=ar`,
         { headers: { Accept: "application/json" } }
       ),
     ]);
 
-    if (!versesResp.ok || !chapterResp.ok) {
+    if (!chapterResp.ok) {
       res.status(502).json({ error: "Failed to fetch verses from Quran.com API" });
       return;
     }
 
-    const [versesData, chapterData] = await Promise.all([
-      versesResp.json() as Promise<{
-        verses: Array<{
-          id: number;
-          verse_key: string;
-          verse_number: number;
-          text_uthmani: string;
-          page_number: number;
-          juz_number: number;
-          hizb_number: number;
-          translations?: Array<{ text: string; resource_id: number }>;
-        }>;
-        pagination: { total_records: number };
-      }>,
-      chapterResp.json() as Promise<{
-        chapter: {
-          id: number;
-          name_simple: string;
-          name_arabic: string;
-          translated_name: { name: string };
-          revelation_place: string;
-          verses_count: number;
-          pages: [number, number];
-        };
-      }>,
-    ]);
+    const chapterData = (await chapterResp.json()) as {
+      chapter: {
+        id: number;
+        name_simple: string;
+        name_arabic: string;
+        translated_name: { name: string };
+        revelation_place: string;
+        verses_count: number;
+        pages: [number, number];
+      };
+    };
 
     const ch = chapterData.chapter;
     const surah = {
@@ -134,10 +174,10 @@ router.get("/surahs/:number/verses", async (req, res): Promise<void> => {
         ch.revelation_place === "makkah" ? "Meccan" : ("Medinan" as const),
       versesCount: ch.verses_count,
       pageNumber: ch.pages?.[0] ?? 1,
-      juzNumber: 1,
+      juzNumber: allVerses[0]?.juz_number ?? 1,
     };
 
-    const verses = versesData.verses.map((v) => ({
+    const verses = allVerses.slice((page - 1) * perPage, page * perPage).map((v) => ({
       id: v.verse_key,
       verseKey: v.verse_key,
       verseNumber: v.verse_number,
@@ -151,9 +191,14 @@ router.get("/surahs/:number/verses", async (req, res): Promise<void> => {
     res.json({
       verses,
       surah,
-      totalCount: versesData.pagination?.total_records ?? verses.length,
+      totalCount: allVerses.length,
     });
   } catch (err) {
+    if (err instanceof IncompleteSurahError) {
+      req.log.error({ err }, "Incomplete surah from Quran.com");
+      res.status(502).json({ error: "Incomplete surah data from source" });
+      return;
+    }
     req.log.error({ err }, "Error fetching surah verses");
     res.status(502).json({ error: "Failed to fetch verses" });
   }
@@ -164,8 +209,8 @@ router.get(
   "/verses/:surahNumber/:verseNumber/tafsir",
   async (req, res): Promise<void> => {
     const params = GetVerseTafsirParams.safeParse(req.params);
-    if (!params.success) {
-      res.status(400).json({ error: params.error.message });
+    if (!params.success || !isValidAyah(params.data.surahNumber, params.data.verseNumber)) {
+      res.status(400).json({ error: "Invalid surah or verse number" });
       return;
     }
 
@@ -173,6 +218,10 @@ router.get(
     const tafsirId = qp.success
       ? (qp.data.tafsirId ?? TAFSIR_ID_DEFAULT)
       : TAFSIR_ID_DEFAULT;
+    if (!ALLOWED_TAFSIR_IDS.has(tafsirId)) {
+      res.status(400).json({ error: "Unsupported tafsir" });
+      return;
+    }
 
     const { surahNumber, verseNumber } = params.data;
     const verseKey = `${surahNumber}:${verseNumber}`;
@@ -208,16 +257,10 @@ router.get(
 
     // Fetch from Quran.com API
     try {
-      const [tafsirResp, verseResp] = await Promise.all([
-        fetchWithTimeout(
-          `${QURAN_API_BASE}/tafsirs/${tafsirId}/by_ayah/${verseKey}`,
-          { headers: { Accept: "application/json" } }
-        ),
-        fetchWithTimeout(
-          `${QURAN_API_BASE}/verses/by_key/${verseKey}?language=ar&fields=text_uthmani`,
-          { headers: { Accept: "application/json" } }
-        ),
-      ]);
+      const tafsirResp = await fetchWithTimeout(
+        `${QURAN_API_BASE}/tafsirs/${tafsirId}/by_ayah/${verseKey}`,
+        { headers: { Accept: "application/json" } }
+      );
 
       if (!tafsirResp.ok) {
         if (tafsirResp.status === 404) {
