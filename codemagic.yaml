@@ -8,6 +8,14 @@ workflows:
       app_store_connect: Codemagic Quran
 
     environment:
+      vars:
+        # Numeric Apple ID of the app in App Store Connect (App Information > Apple ID).
+        # Not a secret.
+        APP_STORE_APPLE_ID: "6767634410"
+        # Read by Codemagic's App Store Connect publisher and appended to `xcrun altool`.
+        # Xcode 26 altool can fail to resolve the app from the bundle ID
+        # ("Cannot determine the Apple ID from Bundle ID"); passing it explicitly avoids the lookup.
+        APP_STORE_CONNECT_ALTOOL_ADDITIONAL_ARGUMENTS: "--apple-id 6767634410"
       node: 22
       xcode: latest
       cocoapods: default
@@ -120,12 +128,20 @@ workflows:
 
           APP_VERSION="1.0.4"
 
-          RAW_BUILD_NUMBER="${CM_BUILD_NUMBER:-12}"
+          # CM_BUILD_NUMBER is not one of Codemagic's built-in variables, so the
+          # previous fallback could produce 12 on every build. Use the next number
+          # after the latest build in TestFlight so a build number is never reused.
+          LATEST_BUILD_NUMBER="$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" --platform IOS)"
+          echo "Latest TestFlight build number: ${LATEST_BUILD_NUMBER:-none}"
 
-          if [ "$RAW_BUILD_NUMBER" -lt 12 ]; then
+          case "$LATEST_BUILD_NUMBER" in
+            "") BUILD_NUMBER="12" ;;
+            *[!0-9]*) echo "Unexpected latest build number: $LATEST_BUILD_NUMBER" >&2; exit 1 ;;
+            *) BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1)) ;;
+          esac
+
+          if [ "$BUILD_NUMBER" -lt 12 ]; then
             BUILD_NUMBER="12"
-          else
-            BUILD_NUMBER="$RAW_BUILD_NUMBER"
           fi
 
           echo "Using iOS app version: $APP_VERSION"
@@ -188,6 +204,14 @@ workflows:
       app_store_connect: Codemagic Quran
 
     environment:
+      vars:
+        # Numeric Apple ID of the app in App Store Connect (App Information > Apple ID).
+        # Not a secret.
+        APP_STORE_APPLE_ID: "6767634410"
+        # Read by Codemagic's App Store Connect publisher and appended to `xcrun altool`.
+        # Xcode 26 altool can fail to resolve the app from the bundle ID
+        # ("Cannot determine the Apple ID from Bundle ID"); passing it explicitly avoids the lookup.
+        APP_STORE_CONNECT_ALTOOL_ADDITIONAL_ARGUMENTS: "--apple-id 6767634410"
       node: 22
       xcode: latest
       cocoapods: default
@@ -300,12 +324,20 @@ workflows:
 
           APP_VERSION="1.0.4"
 
-          RAW_BUILD_NUMBER="${CM_BUILD_NUMBER:-12}"
+          # CM_BUILD_NUMBER is not one of Codemagic's built-in variables, so the
+          # previous fallback could produce 12 on every build. Use the next number
+          # after the latest build in TestFlight so a build number is never reused.
+          LATEST_BUILD_NUMBER="$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" --platform IOS)"
+          echo "Latest TestFlight build number: ${LATEST_BUILD_NUMBER:-none}"
 
-          if [ "$RAW_BUILD_NUMBER" -lt 12 ]; then
+          case "$LATEST_BUILD_NUMBER" in
+            "") BUILD_NUMBER="12" ;;
+            *[!0-9]*) echo "Unexpected latest build number: $LATEST_BUILD_NUMBER" >&2; exit 1 ;;
+            *) BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1)) ;;
+          esac
+
+          if [ "$BUILD_NUMBER" -lt 12 ]; then
             BUILD_NUMBER="12"
-          else
-            BUILD_NUMBER="$RAW_BUILD_NUMBER"
           fi
 
           echo "Using iOS app version: $APP_VERSION"
@@ -343,6 +375,18 @@ workflows:
               --project App.xcodeproj \
               --scheme App
           fi
+
+      - name: Validate IPA with App Store Connect (no upload)
+        script: |
+          set -euo pipefail
+
+          # Runs `xcrun altool --validate-app` with the same additional arguments the
+          # TestFlight publisher uses, which exercises the Apple ID lookup that failed.
+          # --skip-package-upload means nothing is uploaded or submitted.
+          app-store-connect publish \
+            --path "$CM_BUILD_DIR/artifacts/quran/ios/App/build/ios/ipa/*.ipa" \
+            --enable-package-validation \
+            --skip-package-upload
 
     artifacts:
       - artifacts/quran/ios/App/build/ios/ipa/*.ipa
