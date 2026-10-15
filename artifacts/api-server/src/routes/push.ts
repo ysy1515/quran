@@ -1,157 +1,182 @@
 import { Router, type IRouter } from "express";
 import webpush from "web-push";
-import { db, pushSubscriptionsTable, appSettingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { z } from "zod";
+import type { PushSubscription } from "@workspace/db";
+import {
+  deleteSubscription,
+  listSubscriptions,
+  updateSubscription,
+  upsertSubscription,
+} from "../lib/pushStore";
+import { writeLimiter } from "../lib/security";
 
 const router: IRouter = Router();
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY!;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY!;
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:quran@app.com";
 
-if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+const vapidConfigured = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+if (vapidConfigured) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY!, VAPID_PRIVATE_KEY!);
+}
+
+const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM");
+
+// Push service endpoints are long https URLs; anything else is rejected.
+const endpoint = z.string().url().max(2048).refine((u) => u.startsWith("https://"), "https only");
+
+const SubscribeBody = z.object({
+  endpoint,
+  keys: z.object({ p256dh: z.string().min(1).max(256), auth: z.string().min(1).max(256) }),
+  notifyQuran: z.boolean().default(true),
+  notifyDhikr: z.boolean().default(true),
+  notifQuran1: time.optional(),
+  notifQuran2: time.optional(),
+  notifDhikr: time.optional(),
+});
+
+const EndpointBody = z.object({ endpoint });
+
+const PreferencesBody = z.object({
+  endpoint,
+  notifyQuran: z.boolean().optional(),
+  notifyDhikr: z.boolean().optional(),
+});
+
+const TimesBody = z.object({
+  endpoint,
+  notifQuran1: time.optional(),
+  notifQuran2: time.optional(),
+  notifDhikr: time.optional(),
+});
+
+function definedOnly<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Partial<T>;
 }
 
 // GET /api/push/vapid-public-key
 router.get("/vapid-public-key", (_req, res) => {
+  if (!vapidConfigured) {
+    res.status(503).json({ error: "Push notifications are not configured" });
+    return;
+  }
   res.json({ publicKey: VAPID_PUBLIC_KEY });
 });
 
 // POST /api/push/subscribe
-router.post("/subscribe", async (req, res): Promise<void> => {
-  const { endpoint, keys, notifyQuran = true, notifyDhikr = true } = req.body;
-  if (!endpoint || !keys?.p256dh || !keys?.auth) {
+router.post("/subscribe", writeLimiter, async (req, res): Promise<void> => {
+  const parsed = SubscribeBody.safeParse(req.body);
+  if (!parsed.success) {
     res.status(400).json({ error: "Invalid subscription" });
     return;
   }
+  const { endpoint, keys, notifyQuran, notifyDhikr, ...times } = parsed.data;
   try {
-    await db
-      .insert(pushSubscriptionsTable)
-      .values({
-        endpoint,
-        p256dh: keys.p256dh,
-        auth: keys.auth,
-        notifyQuran,
-        notifyDhikr,
-      })
-      .onConflictDoUpdate({
-        target: pushSubscriptionsTable.endpoint,
-        set: { notifyQuran, notifyDhikr, p256dh: keys.p256dh, auth: keys.auth },
-      });
+    await upsertSubscription({
+      endpoint,
+      p256dh: keys.p256dh,
+      auth: keys.auth,
+      notifyQuran,
+      notifyDhikr,
+      ...definedOnly(times),
+    });
     res.json({ ok: true });
   } catch (err) {
-    req.log.error(err);
+    req.log.error({ err }, "Failed to save subscription");
     res.status(500).json({ error: "Failed to save subscription" });
   }
 });
 
 // DELETE /api/push/unsubscribe
-router.delete("/unsubscribe", async (req, res): Promise<void> => {
-  const { endpoint } = req.body;
-  if (!endpoint) { res.status(400).json({ error: "Missing endpoint" }); return; }
+router.delete("/unsubscribe", writeLimiter, async (req, res): Promise<void> => {
+  const parsed = EndpointBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Missing endpoint" });
+    return;
+  }
   try {
-    await db.delete(pushSubscriptionsTable).where(eq(pushSubscriptionsTable.endpoint, endpoint));
+    await deleteSubscription(parsed.data.endpoint);
     res.json({ ok: true });
   } catch (err) {
-    req.log.error(err);
+    req.log.error({ err }, "Failed to unsubscribe");
     res.status(500).json({ error: "Failed to unsubscribe" });
   }
 });
 
-// GET /api/push/times
-router.get("/times", async (_req, res): Promise<void> => {
-  try {
-    const [settings] = await db.select().from(appSettingsTable).where(eq(appSettingsTable.sessionId, "default")).limit(1);
-    res.json({
-      notifQuran1: settings?.notifQuran1 ?? "12:00",
-      notifQuran2: settings?.notifQuran2 ?? "18:00",
-      notifDhikr:  settings?.notifDhikr  ?? "21:00",
-    });
-  } catch {
-    res.json({ notifQuran1: "12:00", notifQuran2: "18:00", notifDhikr: "21:00" });
-  }
-});
-
-// PUT /api/push/times
-router.put("/times", async (req, res): Promise<void> => {
-  const { notifQuran1, notifQuran2, notifDhikr } = req.body as { notifQuran1?: string; notifQuran2?: string; notifDhikr?: string };
-  const timeRe = /^\d{2}:\d{2}$/;
-  if ((notifQuran1 && !timeRe.test(notifQuran1)) ||
-      (notifQuran2 && !timeRe.test(notifQuran2)) ||
-      (notifDhikr  && !timeRe.test(notifDhikr))) {
-    res.status(400).json({ error: "Invalid time format. Use HH:MM" });
+// PUT /api/push/preferences
+router.put("/preferences", writeLimiter, async (req, res): Promise<void> => {
+  const parsed = PreferencesBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid preferences" });
     return;
   }
+  const { endpoint, ...changes } = parsed.data;
   try {
-    const existing = await db.select().from(appSettingsTable).where(eq(appSettingsTable.sessionId, "default")).limit(1);
-    if (existing.length === 0) {
-      await db.insert(appSettingsTable).values({ sessionId: "default", notifQuran1: notifQuran1 ?? "12:00", notifQuran2: notifQuran2 ?? "18:00", notifDhikr: notifDhikr ?? "21:00" });
-    } else {
-      await db.update(appSettingsTable).set({
-        ...(notifQuran1 ? { notifQuran1 } : {}),
-        ...(notifQuran2 ? { notifQuran2 } : {}),
-        ...(notifDhikr  ? { notifDhikr }  : {}),
-        updatedAt: new Date(),
-      }).where(eq(appSettingsTable.sessionId, "default"));
+    const found = await updateSubscription(endpoint, definedOnly(changes));
+    if (!found) {
+      res.status(404).json({ error: "Subscription not found" });
+      return;
     }
-    res.json({ ok: true, notifQuran1, notifQuran2, notifDhikr });
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Failed to save times" });
-  }
-});
-
-// PUT /api/push/preferences
-router.put("/preferences", async (req, res): Promise<void> => {
-  const { endpoint, notifyQuran, notifyDhikr } = req.body;
-  if (!endpoint) { res.status(400).json({ error: "Missing endpoint" }); return; }
-  try {
-    await db
-      .update(pushSubscriptionsTable)
-      .set({ notifyQuran, notifyDhikr })
-      .where(eq(pushSubscriptionsTable.endpoint, endpoint));
     res.json({ ok: true });
   } catch (err) {
-    req.log.error(err);
+    req.log.error({ err }, "Failed to update preferences");
     res.status(500).json({ error: "Failed to update preferences" });
   }
 });
 
-// Helper used by scheduler
-export async function sendPushToAll(
-  filter: "quran" | "dhikr",
-  payload: { title: string; body: string; icon?: string; badge?: string; tag?: string }
-) {
-  const subs = await db.select().from(pushSubscriptionsTable);
+// PUT /api/push/times — reminder times for one subscription only.
+router.put("/times", writeLimiter, async (req, res): Promise<void> => {
+  const parsed = TimesBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid times. Use HH:MM and include the subscription endpoint" });
+    return;
+  }
+  const { endpoint, ...times } = parsed.data;
+  try {
+    const found = await updateSubscription(endpoint, definedOnly(times));
+    if (!found) {
+      res.status(404).json({ error: "Subscription not found" });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to save times");
+    res.status(500).json({ error: "Failed to save times" });
+  }
+});
+
+export type PushPayload = { title: string; body: string; icon?: string; badge?: string; tag?: string };
+
+/**
+ * Sends one payload to the given subscriptions. Subscriptions the push service
+ * reports as gone (404/410) are deleted. Nothing else is sent to anyone.
+ */
+export async function sendPush(
+  subs: PushSubscription[],
+  payload: PushPayload,
+): Promise<{ sent: number; failed: number; removed: number }> {
+  const body = JSON.stringify(payload);
   const results = await Promise.allSettled(
-    subs
-      .filter((s) => (filter === "quran" ? s.notifyQuran : s.notifyDhikr))
-      .map((s) =>
-        webpush.sendNotification(
-          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          JSON.stringify(payload)
-        )
-      )
+    subs.map((s) =>
+      webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, body),
+    ),
   );
-  const failed = results.filter((r) => r.status === "rejected");
-  if (failed.length > 0) {
-    // Clean up expired subscriptions
-    for (const sub of subs) {
-      try {
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          JSON.stringify({ title: "ping" })
-        );
-      } catch (err: unknown) {
-        if (err && typeof err === "object" && "statusCode" in err &&
-            ((err as { statusCode: number }).statusCode === 410 || (err as { statusCode: number }).statusCode === 404)) {
-          await db.delete(pushSubscriptionsTable).where(eq(pushSubscriptionsTable.endpoint, sub.endpoint));
-        }
-      }
+
+  let removed = 0;
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i]!;
+    if (r.status !== "rejected") continue;
+    const status = (r.reason as { statusCode?: number } | undefined)?.statusCode;
+    if (status === 404 || status === 410) {
+      await deleteSubscription(subs[i]!.endpoint);
+      removed++;
     }
   }
-  return { sent: results.length - failed.length, failed: failed.length };
+  const failed = results.filter((r) => r.status === "rejected").length;
+  return { sent: results.length - failed, failed, removed };
 }
+
+export { listSubscriptions };
 
 export default router;
