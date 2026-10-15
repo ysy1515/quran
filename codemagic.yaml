@@ -174,3 +174,178 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+
+  # Verify-only copy of ios-testflight: same install, build, signing and IPA
+  # steps, but with no publishing section, so it never uploads to App Store
+  # Connect or TestFlight. Use it to check a branch before release.
+  # ios-testflight above is unchanged.
+  ios-verify-build:
+    name: iOS Verify Build (no upload)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    integrations:
+      app_store_connect: Codemagic Quran
+
+    environment:
+      node: 22
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.yahya.quran
+
+    scripts:
+      - name: Check repository structure
+        script: |
+          set -euo pipefail
+
+          echo "Current directory:"
+          pwd
+
+          echo "CM_BUILD_DIR:"
+          echo "$CM_BUILD_DIR"
+
+          echo "Repository files:"
+          ls -la "$CM_BUILD_DIR"
+
+          echo "Quran app files:"
+          ls -la "$CM_BUILD_DIR/artifacts/quran"
+
+          echo "Node version:"
+          node --version
+
+      - name: Install pnpm without Corepack
+        script: |
+          set -euo pipefail
+
+          cd "$CM_BUILD_DIR"
+
+          echo "Disable Corepack to avoid yarn packageManager conflict"
+          corepack disable || true
+
+          echo "Install pnpm globally using npm"
+          npm install -g pnpm@10.26.1
+
+          echo "pnpm version:"
+          pnpm --version
+
+      - name: Clean install workspace dependencies
+        script: |
+          set -euo pipefail
+
+          cd "$CM_BUILD_DIR"
+
+          echo "Clean node_modules to avoid missing native optional dependencies"
+          rm -rf node_modules
+          find . -name "node_modules" -type d -prune -exec rm -rf '{}' +
+
+          echo "Prune pnpm store"
+          pnpm store prune || true
+
+          echo "Install workspace dependencies"
+          pnpm install --force --no-frozen-lockfile --config.optional=true
+
+      - name: Install required macOS ARM64 native packages
+        script: |
+          set -euo pipefail
+
+          cd "$CM_BUILD_DIR"
+
+          echo "Install Rollup and LightningCSS native packages for macOS ARM64"
+          pnpm add -Dw @rollup/rollup-darwin-arm64@4.59.0 lightningcss-darwin-arm64@1.31.1 --config.optional=true
+
+          echo "Verify Rollup native package"
+          node -e "require('@rollup/rollup-darwin-arm64'); console.log('Rollup native OK')"
+
+          echo "Verify LightningCSS native binary exists"
+          find "$CM_BUILD_DIR/node_modules/.pnpm" -name "lightningcss.darwin-arm64.node" -print -quit
+
+      - name: Build mobile web app
+        script: |
+          set -euo pipefail
+
+          cd "$CM_BUILD_DIR/artifacts/quran"
+
+          echo "Building mobile web app"
+          pnpm build:mobile
+
+          echo "Check mobile build output"
+          ls -la dist
+          ls -la dist/mobile
+
+      - name: Sync Capacitor iOS
+        script: |
+          set -euo pipefail
+
+          cd "$CM_BUILD_DIR/artifacts/quran"
+
+          echo "Sync Capacitor iOS"
+          npx cap sync ios
+
+      - name: Apply iOS provisioning profiles
+        script: |
+          set -euo pipefail
+
+          cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
+
+          echo "Apply provisioning profiles"
+          xcode-project use-profiles
+
+      - name: Set iOS app version and build number
+        script: |
+          set -euo pipefail
+
+          cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
+
+          APP_VERSION="1.0.4"
+
+          RAW_BUILD_NUMBER="${CM_BUILD_NUMBER:-12}"
+
+          if [ "$RAW_BUILD_NUMBER" -lt 12 ]; then
+            BUILD_NUMBER="12"
+          else
+            BUILD_NUMBER="$RAW_BUILD_NUMBER"
+          fi
+
+          echo "Using iOS app version: $APP_VERSION"
+          echo "Using iOS build number: $BUILD_NUMBER"
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $APP_VERSION" App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $APP_VERSION" App/Info.plist
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" App/Info.plist
+
+          echo "Final CFBundleShortVersionString:"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" App/Info.plist
+
+          echo "Final CFBundleVersion:"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" App/Info.plist
+
+      - name: Build iOS IPA
+        script: |
+          set -euo pipefail
+
+          cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
+
+          echo "Available iOS files:"
+          ls -la
+
+          if [ -d "App.xcworkspace" ]; then
+            echo "Building using App.xcworkspace"
+            xcode-project build-ipa \
+              --workspace App.xcworkspace \
+              --scheme App
+          else
+            echo "App.xcworkspace not found, building using App.xcodeproj"
+            xcode-project build-ipa \
+              --project App.xcodeproj \
+              --scheme App
+          fi
+
+    artifacts:
+      - artifacts/quran/ios/App/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - artifacts/quran/ios/App/DerivedData/**/Build/**/*.app
+      - artifacts/quran/ios/App/DerivedData/**/Build/**/*.dSYM
