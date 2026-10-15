@@ -13,6 +13,7 @@ function isCapacitorNative(): boolean {
 
 async function getVapidKey(): Promise<string> {
   const res = await fetch(`${API_BASE}/api/push/vapid-public-key`);
+  if (!res.ok) throw new Error(`Push not available: ${res.status}`);
   const data = await res.json() as { publicKey: string };
   return data.publicKey;
 }
@@ -51,6 +52,33 @@ export function parseNotifTimes(raw: unknown): NotifTimes | null {
 }
 
 const notifTimesStore = createLocalStore<NotifTimes>("quran.notifTimes.v1", DEFAULT_NOTIF_TIMES, parseNotifTimes);
+
+// The server returns a secret management token once, when this browser's
+// subscription is registered. It is the only way to change or delete that
+// subscription later, so it is kept with the endpoint it belongs to.
+interface PushOwnership {
+  endpoint: string;
+  token: string;
+}
+
+function parseOwnership(raw: unknown): PushOwnership | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const { endpoint, token } = raw as Record<string, unknown>;
+  if (typeof endpoint !== "string" || typeof token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
+  return { endpoint, token };
+}
+
+const ownershipStore = createLocalStore<PushOwnership | null>("quran.pushOwnership.v1", null, parseOwnership);
+
+/** Token for this subscription, or null if this browser doesn't own it on the server. */
+function tokenFor(sub: PushSubscription | null): string | null {
+  const own = ownershipStore.get();
+  return sub && own && own.endpoint === sub.endpoint ? own.token : null;
+}
+
+function authHeaders(token: string): HeadersInit {
+  return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+}
 
 export function usePushNotifications() {
   const [status, setStatus] = useState<NotificationStatus>("default");
@@ -94,7 +122,10 @@ export function usePushNotifications() {
 
     navigator.serviceWorker.ready.then((reg) => {
       reg.pushManager.getSubscription().then((sub) => {
-        if (sub) {
+        // A browser subscription without our token (created before this update,
+        // or under the old keys) isn't manageable; show it as off so the user
+        // can enable notifications again, which replaces it.
+        if (sub && tokenFor(sub)) {
           setSubscription(sub);
           setStatus("subscribed");
         } else {
@@ -120,16 +151,19 @@ export function usePushNotifications() {
         return;
       }
 
-      // Get VAPID key and subscribe
       const vapidKey = await getVapidKey();
+
+      // Always start from a fresh browser subscription: an old one may belong to
+      // rotated keys or have no server token, and the server never re-registers
+      // an existing endpoint.
+      await (await reg.pushManager.getSubscription())?.unsubscribe();
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
       });
 
-      // Send to backend
       const subJson = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
-      await fetch(`${API_BASE}/api/push/subscribe`, {
+      const res = await fetch(`${API_BASE}/api/push/subscribe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -140,6 +174,12 @@ export function usePushNotifications() {
           ...notifTimesStore.get(),
         }),
       });
+      if (!res.ok) {
+        await sub.unsubscribe();
+        throw new Error(`Subscribe failed: ${res.status}`);
+      }
+      const { manageToken } = (await res.json()) as { manageToken: string };
+      ownershipStore.set({ endpoint: sub.endpoint, token: manageToken });
 
       setSubscription(sub);
       setStatus("subscribed");
@@ -156,12 +196,12 @@ export function usePushNotifications() {
     if (!subscription) return;
     setLoading(true);
     try {
-      await fetch(`${API_BASE}/api/push/unsubscribe`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: subscription.endpoint }),
-      });
+      const token = tokenFor(subscription);
+      if (token) {
+        await fetch(`${API_BASE}/api/push/unsubscribe`, { method: "DELETE", headers: authHeaders(token) });
+      }
       await subscription.unsubscribe();
+      ownershipStore.set(null);
       setSubscription(null);
       setStatus("default");
     } catch (err) {
@@ -172,25 +212,26 @@ export function usePushNotifications() {
   }, [subscription]);
 
   const updatePreferences = useCallback(async (newPrefs: PushPreferences) => {
-    if (!subscription) return;
+    const token = tokenFor(subscription);
+    if (!token) return;
     setPrefs(newPrefs);
     localStorage.setItem("push-prefs", JSON.stringify(newPrefs));
-    const subJson = subscription.toJSON() as { endpoint: string };
     await fetch(`${API_BASE}/api/push/preferences`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint: subJson.endpoint, ...newPrefs }),
+      headers: authHeaders(token),
+      body: JSON.stringify(newPrefs),
     });
   }, [subscription]);
 
   const saveTimes = useCallback(async (newTimes: NotifTimes) => {
     const parsed = parseNotifTimes(newTimes) ?? DEFAULT_NOTIF_TIMES;
     notifTimesStore.set(parsed);
-    if (!subscription) return;
+    const token = tokenFor(subscription);
+    if (!token) return;
     const res = await fetch(`${API_BASE}/api/push/times`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint: subscription.endpoint, ...parsed }),
+      headers: authHeaders(token),
+      body: JSON.stringify(parsed),
     });
     if (!res.ok) throw new Error(`Saving times failed: ${res.status}`);
   }, [subscription]);
