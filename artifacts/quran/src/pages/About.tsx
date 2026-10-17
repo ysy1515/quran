@@ -1,6 +1,9 @@
+import Screen from "@/components/shell/Screen";
+
 export default function About() {
   return (
-    <div className="page-enter max-w-2xl mx-auto px-4 py-6" dir="rtl">
+    <Screen title="عن التطبيق" back="/more">
+    <div className="screen__inner page-enter px-4 py-6">
       <div className="text-center mb-8">
         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
           <span className="font-quran text-2xl text-primary">ق</span>
@@ -101,5 +104,6 @@ export default function About() {
         </div>
       </div>
     </div>
+    </Screen>
   );
 }

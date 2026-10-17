@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-client-react";
 import { copyToClipboard, formatAyahForCopy } from "@/lib/clipboard";
 import { toast } from "sonner";
+import Screen from "@/components/shell/Screen";
 
 const TAFSIR_AR = 14;
 const TAFSIR_EN = 169;
@@ -96,11 +97,8 @@ export default function TafsirPage() {
   const { preview, isTruncated } = getConciseTafsir(fullTafsirText);
 
   return (
-    <div className="page-enter max-w-2xl mx-auto px-4 py-6" dir="rtl">
-      <div className="text-center mb-6">
-        <h1 className="font-quran text-2xl font-bold text-foreground mb-1">التفسير والترجمات</h1>
-        <p className="text-sm text-muted-foreground">تفسير ابن كثير مع الترجمة الإنجليزية</p>
-      </div>
+    <Screen title="التفسير والترجمات" subtitle="تفسير ابن كثير مع الترجمة الإنجليزية" back="/more">
+    <div className="screen__inner page-enter px-4 py-5">
 
       {/* Controls */}
       <div className="bg-card border border-border rounded-2xl p-4 mb-5 space-y-3 shadow-sm">
@@ -113,7 +111,7 @@ export default function TafsirPage() {
             className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm font-medium text-foreground appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
             style={{ direction: "rtl" }}
           >
-            {surahs?.map((s) => (
+            {(Array.isArray(surahs) ? surahs : []).map((s) => (
               <option key={s.id} value={s.number}>
                 {s.number}. {s.name} — {s.nameTranslation}
               </option>
@@ -290,5 +288,6 @@ export default function TafsirPage() {
         </div>
       )}
     </div>
+    </Screen>
   );
 }

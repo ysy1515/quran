@@ -1,346 +1,479 @@
-import { useState, useEffect } from "react";
-import { useParams } from "wouter";
-import {
-  useGetSurahVerses,
-  getGetSurahVersesQueryKey,
-  useListSurahs,
-  getListSurahsQueryKey,
-} from "@workspace/api-client-react";
-import { shouldShowBasmalahHeader } from "@workspace/quran-meta";
-import { recordProgress, useReaderSettings, useReadingStop } from "@/lib/userData";
-import TafsirPanel from "@/components/TafsirPanel";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useParams, useSearch } from "wouter";
 import { toast } from "sonner";
+import { useGetSurahVerses, getGetSurahVersesQueryKey, type Verse } from "@workspace/api-client-react";
+import {
+  SURAH_COUNT,
+  ayahCount,
+  compareAyah,
+  isValidSurah,
+  juzOfAyah,
+  pageOfAyah,
+  shouldShowBasmalahHeader,
+  surahName,
+} from "@workspace/quran-meta";
+import Screen from "@/components/shell/Screen";
+import Sheet from "@/components/kit/Sheet";
+import { Segmented } from "@/components/kit/List";
+import { Icon, type IconName } from "@/components/icons/Icon";
+import { setChromeHidden, useChromeHidden } from "@/components/shell/chrome";
+import TafsirPanel from "@/components/TafsirPanel";
+import { FONT_SIZE_MAX, FONT_SIZE_MIN, recordProgress, useReaderSettings, useReadingStop } from "@/lib/userData";
+import { toggleBookmark, toggleFavorite, useBookmarks, useFavorites } from "@/lib/bookmarks";
+import { completeCurrentPortion, undoLastPortion, useKhatmah } from "@/lib/khatmah";
+import { addReadingSeconds } from "@/lib/readingTime";
 import { copyToClipboard, formatAyahForCopy } from "@/lib/clipboard";
+import { shareOrCopy } from "@/lib/share";
+import { hapticSuccess, hapticTap } from "@/lib/haptics";
+import { ar, juzLabel } from "@/lib/format";
+import { readerHref } from "@/lib/useQuranLinks";
 
-interface SelectedVerse {
-  surahNumber: number;
-  verseNumber: number;
-  surahName: string;
-  verseText: string;
-  translationText?: string | null;
-  pageNumber: number;
+/** Counts visible time on this screen into the reading-time statistic. */
+function useReadingTimer() {
+  useEffect(() => {
+    let last = Date.now();
+    const flush = () => {
+      const now = Date.now();
+      if (document.visibilityState === "visible") addReadingSeconds((now - last) / 1000);
+      last = now;
+    };
+    const t = setInterval(flush, 30000);
+    const onVis = () => {
+      if (document.visibilityState === "hidden") flush();
+      else last = Date.now();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVis);
+      flush();
+    };
+  }, []);
+}
+
+function ActionButton({ icon, label, onClick, active, testId }: {
+  icon: IconName;
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  testId?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex flex-col items-center justify-center gap-1.5 min-h-[72px] rounded-2xl text-[0.8rem] font-bold transition-colors active:scale-95 ${
+        active ? "bg-primary text-primary-foreground dark:bg-gold dark:text-[hsl(156_40%_8%)]" : "bg-muted text-foreground"
+      }`}
+      data-testid={testId}
+    >
+      <Icon name={icon} size={22} filled={active} />
+      {label}
+    </button>
+  );
 }
 
 export default function Mushaf() {
   const params = useParams<{ surah?: string }>();
-  const surahParam = parseInt(params.surah ?? "1", 10);
-  const [surahNumber, setSurahNumber] = useState(isNaN(surahParam) ? 1 : surahParam);
-  const [selectedVerse, setSelectedVerse] = useState<SelectedVerse | null>(null);
-  const [tafsirOpen, setTafsirOpen] = useState(false);
-  const [actionVerse, setActionVerse] = useState<SelectedVerse | null>(null);
-  const [showTranslation, setShowTranslation] = useState(false);
+  const search = useSearch();
+  const [, navigate] = useLocation();
+  const parsed = parseInt(params.surah ?? "1", 10);
+  const surahNumber = isValidSurah(parsed) ? parsed : 1;
+  const query = new URLSearchParams(search);
+  const targetAyah = parseInt(query.get("ayah") ?? "", 10);
+  const wirdMode = query.get("wird") === "1";
 
-  const { data: surahs } = useListSurahs({ query: { queryKey: getListSurahsQueryKey() } });
   const { settings, setFontSize } = useReaderSettings();
   const fontSize = settings.fontSize;
+  const [showTranslation, setShowTranslation] = useState(false);
+  const [actionVerse, setActionVerse] = useState<Verse | null>(null);
+  const [tafsirVerse, setTafsirVerse] = useState<Verse | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [visibleAyah, setVisibleAyah] = useState(Number.isFinite(targetAyah) ? targetAyah : 1);
+  const [flash, setFlash] = useState<number | null>(null);
+  const focus = useChromeHidden();
+  const body = useRef<HTMLElement | null>(null);
 
-  const { data: versesData, isLoading, isError } = useGetSurahVerses(
+  const perPage = Math.max(ayahCount(surahNumber), 1);
+  const { data, isLoading, isError, refetch } = useGetSurahVerses(
     surahNumber,
-    { page: 1, perPage: 286 },
-    { query: { queryKey: getGetSurahVersesQueryKey(surahNumber, { page: 1, perPage: 286 }), enabled: surahNumber > 0 } }
+    { page: 1, perPage },
+    { query: { queryKey: getGetSurahVersesQueryKey(surahNumber, { page: 1, perPage }) } },
   );
+  const surah = data?.surah;
+  const verses = useMemo(() => (Array.isArray(data?.verses) ? data.verses : []), [data]);
+  const name = surah?.name ?? surahName(surahNumber);
 
   const { isStopAt, setStop, clearStop } = useReadingStop();
-  const changeFontSize = setFontSize;
+  const bookmarks = useBookmarks();
+  const favorites = useFavorites();
+  const khatmah = useKhatmah();
+  const wird = wirdMode ? khatmah.current : null;
 
-  const surah = versesData?.surah;
-  const verses = versesData?.verses ?? [];
+  useReadingTimer();
+  useEffect(() => () => setChromeHidden(false), []);
+
+  // Jump to ?ayah= once the verses are on screen, or start at the top.
+  useEffect(() => {
+    if (verses.length === 0) return;
+    const ayah = Number.isFinite(targetAyah) ? targetAyah : 1;
+    const el = body.current?.querySelector<HTMLElement>(`[data-ayah="${ayah}"]`);
+    if (el && ayah > 1) {
+      el.scrollIntoView({ block: "center" });
+      setFlash(ayah);
+      const t = setTimeout(() => setFlash(null), 2200);
+      return () => clearTimeout(t);
+    }
+    if (!Number.isFinite(targetAyah)) body.current?.scrollTo({ top: 0 });
+    return undefined;
+  }, [verses, targetAyah, showTranslation]);
+
+  // Record where the reader is: the ayah at the top of the reading area.
+  const record = useCallback(
+    (ayah: number) => {
+      const v = verses.find((x) => x.verseNumber === ayah);
+      recordProgress({
+        lastSurahNumber: surahNumber,
+        lastVerseNumber: ayah,
+        lastPageNumber: v?.pageNumber ?? pageOfAyah(surahNumber, ayah),
+        lastSurahName: name,
+      });
+    },
+    [verses, surahNumber, name],
+  );
 
   useEffect(() => {
-    if (surah) {
-      recordProgress({
-        lastPageNumber: surah.pageNumber,
-        lastSurahNumber: surahNumber,
-        lastVerseNumber: 1,
-        lastSurahName: surah.name,
-      });
-    }
-  }, [surahNumber, surah]);
+    if (verses.length > 0) record(Number.isFinite(targetAyah) ? targetAyah : 1);
+    // Only when a surah (or target) opens; scrolling records the rest.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verses.length > 0, surahNumber, targetAyah]);
 
-  const isBookmarked = (verseNum: number) => isStopAt(surahNumber, verseNum);
+  const scrollTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const onScroll = useCallback(
+    (el: HTMLElement) => {
+      clearTimeout(scrollTimer.current);
+      scrollTimer.current = setTimeout(() => {
+        const rect = el.getBoundingClientRect();
+        const probe = document.elementFromPoint(rect.left + rect.width / 2, rect.top + 56);
+        const ayah = parseInt((probe as HTMLElement | null)?.closest<HTMLElement>("[data-ayah]")?.dataset.ayah ?? "", 10);
+        if (ayah > 0) {
+          setVisibleAyah(ayah);
+          record(ayah);
+        }
+      }, 450);
+    },
+    [record],
+  );
 
-  const toggleBookmark = (verse: SelectedVerse) => {
-    if (!surah) return;
-    if (isStopAt(surahNumber, verse.verseNumber)) {
+  const toggleStop = (v: Verse) => {
+    if (isStopAt(surahNumber, v.verseNumber)) {
       clearStop();
-      toast.success("تمت إزالة العلامة");
+      toast.success("تمت إزالة موضع التوقف");
     } else {
-      setStop({ pageNumber: verse.pageNumber, surahNumber, verseNumber: verse.verseNumber, surahName: surah.name });
-      toast.success("✓ تم وضع علامة على الآية");
+      setStop({ surahNumber, verseNumber: v.verseNumber, pageNumber: v.pageNumber, surahName: name });
+      toast.success("تم حفظ موضع التوقف");
     }
+    hapticTap();
   };
 
-  const handleInlineVerseClick = (verse: { verseNumber: number; text: string; translationText?: string | null; pageNumber: number }) => {
-    if (!surah) return;
-    setActionVerse({
-      surahNumber,
-      verseNumber: verse.verseNumber,
-      surahName: surah.name,
-      verseText: verse.text,
-      translationText: verse.translationText,
-      pageNumber: verse.pageNumber,
-    });
+  const toggleBm = (v: Verse) => {
+    const on = toggleBookmark({ surahNumber, verseNumber: v.verseNumber, pageNumber: v.pageNumber, surahName: name });
+    toast.success(on ? "تمت إضافة فاصل" : "تمت إزالة الفاصل");
+    hapticTap();
   };
 
-  const openTafsir = (verse: SelectedVerse) => {
-    setSelectedVerse(verse);
-    setActionVerse(null);
-    setTafsirOpen(true);
+  const toggleFav = (v: Verse) => {
+    const on = toggleFavorite({ surahNumber, verseNumber: v.verseNumber, pageNumber: v.pageNumber, surahName: name, text: v.text });
+    toast.success(on ? "أُضيفت الآية إلى المفضلة" : "أُزيلت الآية من المفضلة");
+    hapticTap();
   };
 
-  const handleBookmarkFromCard = (e: React.MouseEvent, verse: { verseNumber: number; text: string; translationText?: string | null; pageNumber: number }) => {
-    e.stopPropagation();
-    if (!surah) return;
-    toggleBookmark({ surahNumber, verseNumber: verse.verseNumber, surahName: surah.name, verseText: verse.text, translationText: verse.translationText, pageNumber: verse.pageNumber });
+  const finishWird = () => {
+    if (!khatmah.current) return;
+    const n = khatmah.current.index + 1;
+    completeCurrentPortion();
+    hapticSuccess();
+    toast.success(`تم تسجيل الورد ${ar(n)}`, { action: { label: "تراجع", onClick: () => undoLastPortion() } });
+    navigate("/", { replace: true });
   };
 
-  const prevSurah = () => surahNumber > 1 && setSurahNumber(surahNumber - 1);
-  const nextSurah = () => surahNumber < 114 && setSurahNumber(surahNumber + 1);
+  const page = verses.find((v) => v.verseNumber === visibleAyah)?.pageNumber ?? pageOfAyah(surahNumber, visibleAyah);
+  const wirdEndsHere = wird && wird.to.surah === surahNumber ? wird.to.ayah : null;
+  const wirdPassed = wird ? compareAyah({ surah: surahNumber, ayah: visibleAyah }, wird.to) >= 0 : false;
+
+  const verseClass = (n: number) => {
+    if (flash === n) return "bg-gold/25 rounded";
+    if (isStopAt(surahNumber, n)) return "text-primary dark:text-gold";
+    return "";
+  };
+
+  const wirdEnd = (
+    <div className="card card--raised my-6 px-5 py-4 text-center font-sans" data-testid="wird-end">
+      <p className="text-sm font-bold text-primary dark:text-gold">نهاية الورد</p>
+      <button type="button" className="btn btn-gold w-full mt-3" onClick={finishWird}>
+        أتممت القراءة
+        <Icon name="check" size={20} strokeWidth={2.4} />
+      </button>
+    </div>
+  );
 
   return (
-    <div className="page-enter max-w-3xl mx-auto px-4 py-6" dir="rtl">
-      {/* Top Controls */}
-      <div className="flex items-center gap-2 mb-6">
-        <div className="flex-1">
-          <select
-            value={surahNumber}
-            onChange={(e) => setSurahNumber(parseInt(e.target.value, 10))}
-            className="w-full bg-card border border-border rounded-lg px-3 py-2.5 text-sm font-medium text-foreground appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
-            style={{ direction: "rtl" }}
-          >
-            {surahs?.map((s) => (
-              <option key={s.id} value={s.number}>{s.number}. {s.name}</option>
-            ))}
-          </select>
-        </div>
+    <Screen
+      title={`سورة ${name}`}
+      subtitle={`${juzLabel(juzOfAyah(surahNumber, visibleAyah))} · صفحة ${ar(page)}`}
+      back="/index"
+      endActions={[
+        { label: "إعدادات القراءة", icon: <Icon name="textSize" size={24} />, onClick: () => setSettingsOpen(true), testId: "reader-settings" },
+        { label: "وضع التركيز", icon: <Icon name="book" size={24} />, onClick: () => setChromeHidden(true), testId: "focus-mode" },
+      ]}
+      restoreScroll={false}
+      onBodyScroll={onScroll}
+      bodyRef={(el) => {
+        body.current = el;
+      }}
+    >
+      {focus && (
+        <button
+          type="button"
+          onClick={() => setChromeHidden(false)}
+          className="fixed z-40 left-3 top-[calc(var(--safe-top)+10px)] h-10 px-4 rounded-full bg-black/55 text-white text-sm font-bold backdrop-blur"
+          data-testid="exit-focus"
+        >
+          إنهاء وضع التركيز
+        </button>
+      )}
 
-        <div className="flex items-center bg-muted rounded-lg p-0.5 text-xs font-bold flex-shrink-0">
-          <button onClick={() => setShowTranslation(false)} className={`px-3 py-1.5 rounded-md transition-all ${!showTranslation ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>عربي</button>
-          <button onClick={() => setShowTranslation(true)} className={`px-3 py-1.5 rounded-md transition-all ${showTranslation ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>EN</button>
-        </div>
-
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={() => changeFontSize(Math.max(80, fontSize - 10))} className="w-8 h-8 rounded-lg bg-muted hover:bg-border transition-colors flex items-center justify-center text-xs font-bold text-muted-foreground">ص</button>
-          <button onClick={() => changeFontSize(Math.min(160, fontSize + 10))} className="w-9 h-9 rounded-lg bg-muted hover:bg-border transition-colors flex items-center justify-center font-bold text-muted-foreground">ص</button>
-        </div>
-      </div>
-
-      {/* Surah Header */}
-      {surah && (
-        <div className="surah-header mb-6">
-          <p className="font-quran text-2xl font-bold text-foreground mb-1">سورة {surah.name}</p>
-          <p className="text-sm text-muted-foreground">
-            {surah.nameSimple} • {surah.nameTranslation} • {surah.revelationType === "Meccan" ? "مكية" : "مدنية"} • {surah.versesCount} آية
-          </p>
-          {shouldShowBasmalahHeader(surahNumber) && (
-            <p className="font-quran text-xl text-primary/80 mt-3">بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</p>
+      {wird && (
+        <div className="sticky top-0 z-10 flex items-center gap-3 px-4 py-2.5 bg-[hsl(var(--gold)/0.16)] backdrop-blur border-b border-gold/30 text-sm" data-testid="wird-banner">
+          <span className="flex-1 min-w-0 font-bold text-foreground truncate">
+            الورد {ar(wird.index + 1)}: إلى سورة {surahName(wird.to.surah)} آية {ar(wird.to.ayah)}
+          </span>
+          {wirdPassed && (
+            <button type="button" className="btn btn-gold !min-h-9 !px-3 !text-sm" onClick={finishWird} data-testid="wird-banner-finish">
+              أتممت
+            </button>
           )}
         </div>
       )}
 
-      {isLoading && (
-        <div className="space-y-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="skeleton rounded-xl" style={{ height: `${60 + (i % 3) * 20}px` }} />
-          ))}
-        </div>
-      )}
-
-      {isError && (
-        <div className="flex flex-col items-center py-20 text-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-7 h-7 text-destructive">
-              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-          </div>
-          <div>
-            <p className="font-medium text-foreground mb-1">تعذّر تحميل الآيات</p>
+      <div className="screen__inner px-4 pt-4 pb-10 page-enter">
+        <div className="surah-header mb-5">
+          <p className="font-quran text-2xl text-foreground mb-1">سورة {name}</p>
+          {surah && (
             <p className="text-sm text-muted-foreground">
-              {navigator.onLine
-                ? "تعذّر الاتصال بمصدر بيانات القرآن"
-                : "تحقق من اتصالك بالإنترنت"}
+              {surah.revelationType === "Meccan" ? "مكية" : "مدنية"} · {ar(surah.versesCount)} آية
             </p>
-          </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-          >
-            إعادة المحاولة
-          </button>
+          )}
+          {shouldShowBasmalahHeader(surahNumber) && (
+            <p className="font-quran text-xl text-primary/80 dark:text-gold/90 mt-3">بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</p>
+          )}
         </div>
-      )}
 
-      {/* Verses — Arabic flowing mode */}
-      {verses.length > 0 && !showTranslation && (
-        <>
-          <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3.5 h-3.5 flex-shrink-0">
-              <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-            </svg>
-            اضغط على أي آية لوضع علامة أو فتح التفسير
+        {isLoading && (
+          <div className="space-y-4" aria-label="جاري تحميل الآيات">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="skeleton rounded-xl" style={{ height: `${60 + (i % 3) * 20}px` }} />
+            ))}
           </div>
-          <div className="bg-card rounded-2xl border border-border px-5 py-6 shadow-sm">
-            <p className="font-quran text-foreground leading-[2.6] text-right" style={{ fontSize: `${fontSize}%` }} dir="rtl">
-              {verses.map((verse) => (
-                <span key={verse.id}>
+        )}
+
+        {isError && (
+          <div className="flex flex-col items-center py-16 text-center gap-4" data-testid="reader-error">
+            <p className="font-bold text-foreground">تعذّر تحميل الآيات</p>
+            <p className="text-sm text-muted-foreground">
+              {navigator.onLine ? "تعذّر الاتصال بمصدر بيانات القرآن" : "تحقق من اتصالك بالإنترنت"}
+            </p>
+            <button type="button" onClick={() => void refetch()} className="btn btn-primary px-8">
+              إعادة المحاولة
+            </button>
+          </div>
+        )}
+
+        {verses.length > 0 && !showTranslation && (
+          <div className="card px-5 py-6">
+            <div
+              className="font-quran text-foreground leading-[2.5] text-justify"
+              style={{ fontSize: `${fontSize * 1.3}%` }}
+              dir="rtl"
+              data-testid="mushaf-text"
+            >
+              {verses.map((v) => (
+                <span key={v.id} data-ayah={v.verseNumber}>
                   <span
-                    className={`cursor-pointer rounded transition-colors ${
-                      isBookmarked(verse.verseNumber)
-                        ? "text-primary bg-primary/5 px-0.5"
-                        : "hover:text-primary hover:bg-primary/5"
-                    }`}
-                    onClick={() => handleInlineVerseClick(verse)}
+                    role="button"
+                    tabIndex={0}
+                    className={`cursor-pointer transition-colors ${verseClass(v.verseNumber)}`}
+                    onClick={() => setActionVerse(v)}
+                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setActionVerse(v))}
+                    aria-label={`الآية ${v.verseNumber}، اضغط لخيارات الآية`}
                   >
-                    {verse.text}
+                    {v.text}
                   </span>
-                  <span
-                    className="inline-flex items-center justify-center mx-1 cursor-pointer align-middle"
-                    onClick={() => handleInlineVerseClick(verse)}
-                    title={`الآية ${verse.verseNumber}`}
-                  >
-                    <span
-                      className={`font-sans transition-colors select-none ${isBookmarked(verse.verseNumber) ? "text-primary" : "text-primary/70 hover:text-primary"}`}
-                      style={{ fontSize: "55%", lineHeight: 1 }}
-                    >
-                      ﴿{verse.verseNumber}﴾
-                    </span>
-                  </span>
+                  <span className="ayah-mark" aria-hidden="true">
+                    {ar(v.verseNumber)}
+                  </span>{" "}
+                  {wirdEndsHere === v.verseNumber && <span className="block">{wirdEnd}</span>}
                 </span>
               ))}
-            </p>
-          </div>
-        </>
-      )}
-
-      {/* Verses — EN translation mode */}
-      {verses.length > 0 && showTranslation && (
-        <div className="space-y-2">
-          {verses.map((verse) => (
-            <div
-              key={verse.id}
-              className="verse-item group"
-              onClick={() => openTafsir({ surahNumber, verseNumber: verse.verseNumber, surahName: surah?.name ?? "", verseText: verse.text, translationText: verse.translationText, pageNumber: verse.pageNumber })}
-            >
-              <div className="flex items-start gap-3">
-                <div className="verse-number flex-shrink-0 mt-1" style={{ fontSize: "0.65rem" }}>{verse.verseNumber}</div>
-                <div className="flex-1">
-                  <p className="font-quran text-foreground text-right leading-loose" style={{ fontSize: `${fontSize}%` }} dir="rtl">{verse.text}</p>
-                  {verse.translationText && (
-                    <p className="text-sm text-muted-foreground mt-2 leading-relaxed border-t border-border/50 pt-2" dir="ltr" style={{ textAlign: "left", fontFamily: "sans-serif" }}>{verse.translationText}</p>
-                  )}
-                </div>
-                <button
-                  onClick={(e) => handleBookmarkFromCard(e, verse)}
-                  className={`flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity mt-1 p-1.5 rounded-lg ${
-                    isBookmarked(verse.verseNumber) ? "opacity-100 text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                  }`}
-                >
-                  <svg viewBox="0 0 24 24" fill={isBookmarked(verse.verseNumber) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.75" className="w-4 h-4">
-                    <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
-                  </svg>
-                </button>
-              </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between mt-10 pt-6 border-t border-border">
-        <button onClick={nextSurah} disabled={surahNumber >= 114} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card border border-border hover:border-primary/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4 h-4 rotate-180"><polyline points="9 18 15 12 9 6" /></svg>
-          السورة التالية
-        </button>
-        <span className="text-xs text-muted-foreground">{surahNumber} / 114</span>
-        <button onClick={prevSurah} disabled={surahNumber <= 1} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card border border-border hover:border-primary/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium">
-          السورة السابقة
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4 h-4"><polyline points="9 18 15 12 9 6" /></svg>
-        </button>
+        {verses.length > 0 && showTranslation && (
+          <div className="space-y-3">
+            {verses.map((v) => (
+              <div key={v.id} data-ayah={v.verseNumber}>
+                <button type="button" className={`card w-full px-4 py-4 text-right ${verseClass(v.verseNumber)}`} onClick={() => setActionVerse(v)}>
+                  <p className="font-quran text-foreground leading-[2.2]" style={{ fontSize: `${fontSize * 1.2}%` }} dir="rtl">
+                    {v.text}
+                    <span className="ayah-mark" aria-hidden="true">
+                      {ar(v.verseNumber)}
+                    </span>
+                  </p>
+                  {v.translationText && (
+                    <p className="text-sm text-muted-foreground mt-2 leading-relaxed border-t border-border/60 pt-2 text-left" dir="ltr">
+                      {v.translationText}
+                    </p>
+                  )}
+                </button>
+                {wirdEndsHere === v.verseNumber && wirdEnd}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {verses.length > 0 && (
+          <nav className="grid grid-cols-2 gap-3 mt-8" aria-label="التنقل بين السور">
+            {surahNumber < SURAH_COUNT ? (
+              <Link href={readerHref({ surah: surahNumber + 1, ayah: 1 }, { wird: wirdMode })} className="btn btn-soft">
+                <Icon name="chevronStart" size={18} />
+                سورة {surahName(surahNumber + 1)}
+              </Link>
+            ) : (
+              <span />
+            )}
+            {surahNumber > 1 ? (
+              <Link href={readerHref({ surah: surahNumber - 1, ayah: 1 }, { wird: wirdMode })} className="btn btn-soft">
+                سورة {surahName(surahNumber - 1)}
+                <Icon name="chevronEnd" size={18} />
+              </Link>
+            ) : (
+              <span />
+            )}
+          </nav>
+        )}
       </div>
 
-      {/* Verse Action Popup */}
-      {actionVerse && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setActionVerse(null)}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative bg-card rounded-t-2xl border-t border-border shadow-xl w-full max-w-lg mx-auto p-5 pb-8" onClick={(e) => e.stopPropagation()} dir="rtl">
-            <div className="flex justify-center mb-4">
-              <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-            </div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <span className="text-primary font-bold text-xs" style={{ direction: "ltr" }}>{actionVerse.verseNumber}</span>
-              </div>
-              <div>
-                <p className="font-quran text-base font-bold text-foreground">{actionVerse.surahName}</p>
-                <p className="text-xs text-muted-foreground">الآية {actionVerse.verseNumber}</p>
-              </div>
-              <button onClick={() => setActionVerse(null)} className="mr-auto w-7 h-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-            <div className="bg-muted/50 rounded-xl px-4 py-3 mb-5">
-              <p className="font-quran text-foreground text-right leading-loose text-base" dir="rtl" style={{ fontSize: `${Math.min(fontSize, 110)}%` }}>
-                {actionVerse.verseText}
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => { toggleBookmark(actionVerse); setActionVerse(null); }}
-                className={`flex items-center justify-center gap-1.5 py-3.5 rounded-xl font-medium text-sm transition-all active:scale-95 ${
-                  isBookmarked(actionVerse.verseNumber)
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-primary/10 text-primary hover:bg-primary/20"
-                }`}
-              >
-                <svg viewBox="0 0 24 24" fill={isBookmarked(actionVerse.verseNumber) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-4 h-4">
-                  <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
-                </svg>
-                {isBookmarked(actionVerse.verseNumber) ? "إزالة" : "علامة"}
-              </button>
-              <button
-                onClick={() => openTafsir(actionVerse)}
-                className="flex items-center justify-center gap-1.5 py-3.5 rounded-xl bg-muted text-foreground hover:bg-border font-medium text-sm transition-all active:scale-95"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4 h-4">
-                  <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
-                </svg>
-                تفسير
-              </button>
-              <button
+      <Sheet open={!!actionVerse} onClose={() => setActionVerse(null)} title={actionVerse ? `سورة ${name} · الآية ${ar(actionVerse.verseNumber)}` : undefined}>
+        {actionVerse && (
+          <>
+            <p className="font-quran text-foreground leading-loose text-lg bg-muted/60 rounded-2xl px-4 py-3 mb-4 max-h-40 overflow-y-auto" dir="rtl">
+              {actionVerse.text}
+            </p>
+            <div className="grid grid-cols-3 gap-2 pb-2" data-testid="ayah-actions">
+              <ActionButton
+                icon="pin"
+                label="موضع التوقف"
+                active={isStopAt(surahNumber, actionVerse.verseNumber)}
+                onClick={() => toggleStop(actionVerse)}
+                testId="action-stop"
+              />
+              <ActionButton
+                icon={bookmarks.has(surahNumber, actionVerse.verseNumber) ? "bookmark" : "bookmarkPlus"}
+                label={bookmarks.has(surahNumber, actionVerse.verseNumber) ? "إزالة الفاصل" : "إضافة فاصل"}
+                active={bookmarks.has(surahNumber, actionVerse.verseNumber)}
+                onClick={() => toggleBm(actionVerse)}
+                testId="action-bookmark"
+              />
+              <ActionButton
+                icon="star"
+                label={favorites.has(surahNumber, actionVerse.verseNumber) ? "في المفضلة" : "إلى المفضلة"}
+                active={favorites.has(surahNumber, actionVerse.verseNumber)}
+                onClick={() => toggleFav(actionVerse)}
+                testId="action-favorite"
+              />
+              <ActionButton
+                icon="tafsir"
+                label="التفسير"
                 onClick={() => {
-                  copyToClipboard(
-                    formatAyahForCopy(actionVerse.verseText, actionVerse.surahName, actionVerse.verseNumber),
-                    "تم نسخ الآية"
-                  );
+                  setTafsirVerse(actionVerse);
                   setActionVerse(null);
                 }}
-                className="flex items-center justify-center gap-1.5 py-3.5 rounded-xl bg-muted text-foreground hover:bg-border font-medium text-sm transition-all active:scale-95"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4 h-4">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                </svg>
-                نسخ
-              </button>
+                testId="action-tafsir"
+              />
+              <ActionButton
+                icon="copy"
+                label="نسخ"
+                onClick={() => {
+                  void copyToClipboard(formatAyahForCopy(actionVerse.text, name, actionVerse.verseNumber), "تم نسخ الآية");
+                  setActionVerse(null);
+                }}
+                testId="action-copy"
+              />
+              <ActionButton
+                icon="share"
+                label="مشاركة"
+                onClick={() => {
+                  void shareOrCopy({ title: `سورة ${name}`, text: formatAyahForCopy(actionVerse.text, name, actionVerse.verseNumber) });
+                  setActionVerse(null);
+                }}
+                testId="action-share"
+              />
+            </div>
+          </>
+        )}
+      </Sheet>
+
+      <Sheet open={settingsOpen} onClose={() => setSettingsOpen(false)} title="إعدادات القراءة">
+        <div className="space-y-5 pb-3">
+          <Segmented
+            label="طريقة العرض"
+            value={showTranslation ? "en" : "ar"}
+            onChange={(v) => setShowTranslation(v === "en")}
+            options={[
+              { value: "ar", label: "النص العربي" },
+              { value: "en", label: "مع الترجمة" },
+            ]}
+          />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label htmlFor="font-size" className="font-bold text-foreground">
+                حجم الخط
+              </label>
+              <span className="text-sm text-muted-foreground">{ar(fontSize)}٪</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-quran text-sm" aria-hidden="true">ص</span>
+              <input
+                id="font-size"
+                type="range"
+                min={FONT_SIZE_MIN}
+                max={FONT_SIZE_MAX}
+                step={10}
+                value={fontSize}
+                onChange={(e) => setFontSize(parseInt(e.target.value, 10))}
+                className="flex-1 accent-[hsl(var(--primary))]"
+              />
+              <span className="font-quran text-2xl" aria-hidden="true">ص</span>
             </div>
           </div>
         </div>
-      )}
+      </Sheet>
 
-      {/* Tafsir Panel */}
-      {selectedVerse && (
+      {tafsirVerse && (
         <TafsirPanel
-          open={tafsirOpen}
-          onClose={() => setTafsirOpen(false)}
-          surahNumber={selectedVerse.surahNumber}
-          verseNumber={selectedVerse.verseNumber}
-          surahName={selectedVerse.surahName}
-          verseText={selectedVerse.verseText}
-          translationText={selectedVerse.translationText}
-          isBookmarked={isBookmarked(selectedVerse.verseNumber)}
-          onBookmark={() => toggleBookmark(selectedVerse)}
+          open={!!tafsirVerse}
+          onClose={() => setTafsirVerse(null)}
+          surahNumber={surahNumber}
+          verseNumber={tafsirVerse.verseNumber}
+          surahName={name}
+          verseText={tafsirVerse.text}
+          translationText={tafsirVerse.translationText}
+          isBookmarked={isStopAt(surahNumber, tafsirVerse.verseNumber)}
+          onBookmark={() => toggleStop(tafsirVerse)}
         />
       )}
-    </div>
+    </Screen>
   );
 }
