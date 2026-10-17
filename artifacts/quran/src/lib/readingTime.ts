@@ -28,6 +28,49 @@ export function addReadingSeconds(seconds: number, now = new Date()) {
   }));
 }
 
+/**
+ * Counts only the time the reader is visible. Each visible stretch is added when it
+ * ends: on the periodic tick, when the app goes to the background (the page is
+ * already hidden by then, so the stretch is closed from its recorded start, not by
+ * checking visibility), and on unmount. Hidden time is never counted.
+ */
+export function createReadingTracker(opts: {
+  now?: () => number;
+  add?: (seconds: number) => void;
+  visible: boolean;
+}) {
+  const now = opts.now ?? Date.now;
+  const add = opts.add ?? ((s: number) => addReadingSeconds(s));
+  let visibleSince: number | null = opts.visible ? now() : null;
+  let stopped = false;
+
+  const flush = () => {
+    if (visibleSince == null) return;
+    const t = now();
+    add((t - visibleSince) / 1000);
+    visibleSince = t;
+  };
+
+  return {
+    /** Periodic save while visible. */
+    tick: flush,
+    /** The app or page was hidden: record the stretch that just ended and stop counting. */
+    hide() {
+      flush();
+      visibleSince = null;
+    },
+    /** Visible again: start a new stretch (background time is not counted). */
+    show() {
+      if (!stopped && visibleSince == null) visibleSince = now();
+    },
+    /** The reader closed: record the final stretch. */
+    stop() {
+      this.hide();
+      stopped = true;
+    },
+  };
+}
+
 export function useReadingTime() {
   return useLocalStore(readingTimeStore);
 }

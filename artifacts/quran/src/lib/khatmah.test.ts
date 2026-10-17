@@ -4,7 +4,9 @@ import {
   PLAN_PRESETS,
   completeCurrentPortion,
   createPlan,
+  isFullKhatmah,
   isWithin,
+  khatmahStats,
   khatmahStore,
   pagesFrom,
   parseKhatmahState,
@@ -103,6 +105,74 @@ describe("khatmah progress", () => {
   });
 });
 
+describe("partial plans are not full khatmas", () => {
+  beforeEach(() => khatmahStore.reset());
+
+  const finish = () => {
+    const total = summarize(khatmahStore.get()).total;
+    for (let i = 0; i < total; i++) completeCurrentPortion(NOW);
+  };
+
+  it.each(Array.from({ length: 29 }, (_, i) => i + 2))("a plan from juz %i is recorded as a partial plan", (startJuz) => {
+    startKhatmah(createPlan({ unit: "rub", size: 8, startJuz }, NOW));
+    const before = summarize(khatmahStore.get());
+    expect(before.fullPlan).toBe(false);
+    expect(before.total).toBe(31 - startJuz);
+    finish();
+    const v = summarize(khatmahStore.get());
+    expect(v.finished).toBe(true);
+    expect(v.history.at(-1)).toMatchObject({ startJuz, portions: 31 - startJuz });
+    expect(v.stats).toMatchObject({ fullCount: 0, partialCount: 1, lastFull: null });
+    expect(isFullKhatmah(v.history[0]!)).toBe(false);
+  });
+
+  it("covers juz 2–30 contiguously for every preset and a custom split", () => {
+    for (let startJuz = 2; startJuz <= 30; startJuz++) {
+      for (const p of PLAN_PRESETS) expectContiguous(createPlan({ unit: p.unit, size: p.size, startJuz }, NOW));
+      expectContiguous(createPlan({ unit: "page", portions: Math.min(7, pagesFrom(startJuz)), startJuz }, NOW));
+    }
+  });
+
+  it("counts only juz-1 plans as full khatmas, in order", () => {
+    startKhatmah(createPlan({ unit: "rub", size: 8 }, NOW));
+    finish();
+    startKhatmah(createPlan({ unit: "rub", size: 8, startJuz: 15 }, NOW));
+    finish();
+    startKhatmah(createPlan({ unit: "page", portions: 3, startJuz: 30 }, NOW));
+    finish();
+    const { stats, history } = summarize(khatmahStore.get());
+    expect(history.map((h) => h.startJuz)).toEqual([1, 15, 30]);
+    expect(stats).toMatchObject({ fullCount: 1, partialCount: 2 });
+    expect(stats.lastFull?.startJuz).toBe(1);
+    expect(stats.lastPartial?.startJuz).toBe(30);
+  });
+
+  it("marks a juz-1 plan as full and counts it once finished", () => {
+    startKhatmah(createPlan({ unit: "page", portions: 3 }, NOW));
+    expect(summarize(khatmahStore.get()).fullPlan).toBe(true);
+    finish();
+    expect(summarize(khatmahStore.get()).stats).toMatchObject({ fullCount: 1, partialCount: 0 });
+  });
+
+  it("undo of the last portion of a partial plan removes it from history", () => {
+    startKhatmah(createPlan({ unit: "rub", size: 8, startJuz: 29 }, NOW));
+    finish();
+    expect(summarize(khatmahStore.get()).stats.partialCount).toBe(1);
+    undoLastPortion();
+    expect(summarize(khatmahStore.get()).stats).toMatchObject({ fullCount: 0, partialCount: 0 });
+  });
+
+  it("khatmahStats separates kinds", () => {
+    const at = NOW.toISOString();
+    expect(
+      khatmahStats([
+        { startedAt: at, completedAt: at, portions: 30, startJuz: 1 },
+        { startedAt: at, completedAt: at, portions: 2, startJuz: 29 },
+      ]),
+    ).toMatchObject({ fullCount: 1, partialCount: 1 });
+  });
+});
+
 describe("khatmah parsing", () => {
   const plan = createPlan({ unit: "rub", size: 4 }, NOW);
 
@@ -125,5 +195,18 @@ describe("khatmah parsing", () => {
     });
     expect(state?.plan).toBeNull();
     expect(state?.history).toHaveLength(1);
+  });
+
+  it("keeps the start juz of history entries and rejects an invalid one", () => {
+    const at = NOW.toISOString();
+    const state = parseKhatmahState({
+      plan: null,
+      history: [
+        { startedAt: at, completedAt: at, portions: 30 }, // older entry without startJuz
+        { startedAt: at, completedAt: at, portions: 2, startJuz: 29 },
+        { startedAt: at, completedAt: at, portions: 2, startJuz: 40 },
+      ],
+    });
+    expect(state?.history.map((h) => h.startJuz)).toEqual([1, 29]);
   });
 });

@@ -55,7 +55,7 @@ export default function More() {
   const readingTime = useReadingTime();
   const dhikr = useDhikrState();
   const supported = remindersSupported();
-  const lastKhatmah = k.history.at(-1);
+  const { fullCount, partialCount, lastFull } = k.stats;
   const webNote = supported ? undefined : "التذكيرات اليومية متاحة في تطبيق الآيفون.";
 
   return (
@@ -66,7 +66,7 @@ export default function More() {
             icon="book"
             gold
             href="/"
-            label="الختمة الحالية"
+            label={k.plan && !k.fullPlan ? "خطة القراءة الحالية" : "الختمة الحالية"}
             hint={k.plan ? (k.finished ? "مكتملة" : `الورد ${ar(k.completed + 1)} من ${ar(k.total)}`) : "لا توجد ختمة حالية"}
             value={k.plan ? <Badge>{ar(Math.round(k.progress * 100))}٪</Badge> : undefined}
             testId="more-khatmah"
@@ -102,8 +102,11 @@ export default function More() {
         </ListSection>
 
         <ListSection title="الإحصائيات">
-          <ListRow icon="checkCircle" label="الختمات المكتملة" value={ar(k.history.length)} testId="stat-khatmas" />
-          <ListRow icon="calendar" label="آخر ختمة" value={lastKhatmah ? shortDate(lastKhatmah.completedAt) : "لا يوجد"} />
+          <ListRow icon="checkCircle" label="الختمات المكتملة" hint="من أول المصحف إلى آخره" value={ar(fullCount)} testId="stat-khatmas" />
+          {partialCount > 0 && (
+            <ListRow icon="book" label="خطط القراءة المكتملة" hint="بدأت من جزء بعد الأول" value={ar(partialCount)} testId="stat-partial-plans" />
+          )}
+          <ListRow icon="calendar" label="آخر ختمة" value={lastFull ? shortDate(lastFull.completedAt) : "لا يوجد"} />
           <ListRow
             icon="clock"
             label="الوقت المستغرق في المصحف"

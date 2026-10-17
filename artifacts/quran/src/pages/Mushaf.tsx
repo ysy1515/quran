@@ -21,7 +21,7 @@ import TafsirPanel from "@/components/TafsirPanel";
 import { FONT_SIZE_MAX, FONT_SIZE_MIN, recordProgress, useReaderSettings, useReadingStop } from "@/lib/userData";
 import { toggleBookmark, toggleFavorite, useBookmarks, useFavorites } from "@/lib/bookmarks";
 import { completeCurrentPortion, undoLastPortion, useKhatmah } from "@/lib/khatmah";
-import { addReadingSeconds } from "@/lib/readingTime";
+import { createReadingTracker } from "@/lib/readingTime";
 import { copyToClipboard, formatAyahForCopy } from "@/lib/clipboard";
 import { shareOrCopy } from "@/lib/share";
 import { hapticSuccess, hapticTap } from "@/lib/haptics";
@@ -31,22 +31,18 @@ import { readerHref } from "@/lib/useQuranLinks";
 /** Counts visible time on this screen into the reading-time statistic. */
 function useReadingTimer() {
   useEffect(() => {
-    let last = Date.now();
-    const flush = () => {
-      const now = Date.now();
-      if (document.visibilityState === "visible") addReadingSeconds((now - last) / 1000);
-      last = now;
-    };
-    const t = setInterval(flush, 30000);
-    const onVis = () => {
-      if (document.visibilityState === "hidden") flush();
-      else last = Date.now();
-    };
+    const tracker = createReadingTracker({ visible: document.visibilityState === "visible" });
+    const t = setInterval(() => tracker.tick(), 30000);
+    const onVis = () => (document.visibilityState === "hidden" ? tracker.hide() : tracker.show());
+    // pagehide covers the WebView being torn down without a visibilitychange.
+    const onHide = () => tracker.hide();
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pagehide", onHide);
     return () => {
       clearInterval(t);
       document.removeEventListener("visibilitychange", onVis);
-      flush();
+      window.removeEventListener("pagehide", onHide);
+      tracker.stop();
     };
   }, []);
 }

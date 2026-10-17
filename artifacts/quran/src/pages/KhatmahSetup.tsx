@@ -60,7 +60,7 @@ export default function KhatmahSetup() {
 
   const start = () => {
     startKhatmah(createPlan(options));
-    toast.success("بدأت ختمة جديدة، وفقك الله");
+    toast.success(startJuz === 1 ? "بدأت ختمة جديدة، وفقك الله" : "بدأت خطة قراءة جديدة، وفقك الله");
     navigate("/", { replace: true });
   };
 
@@ -123,7 +123,7 @@ export default function KhatmahSetup() {
           )}
         </ListSection>
 
-        <ListSection title="البداية" footer="اختر جزءًا إذا كنت قد قرأت ما قبله، وتبدأ الختمة منه إلى آخر المصحف.">
+        <ListSection title="البداية" footer="الختمة الكاملة تبدأ من أول المصحف. إذا اخترت جزءًا آخر تصبح خطة قراءة منه إلى آخر المصحف، وتُسجّل عند إتمامها خطة مكتملة لا ختمة كاملة.">
           <div className="list-row list-row--plain">
             <label htmlFor="start-juz" className="list-row__body list-row__label">
               ابدأ من
@@ -147,7 +147,9 @@ export default function KhatmahSetup() {
 
         <section className="px-4 mt-6">
           <div className="card px-5 py-4" data-testid="plan-summary">
-            <p className="text-sm font-bold text-muted-foreground">ملخص الخطة</p>
+            <p className="text-sm font-bold text-muted-foreground">
+              {startJuz === 1 ? "ملخص الخطة: ختمة كاملة" : `ملخص الخطة: خطة قراءة من ${juzLabel(startJuz)}`}
+            </p>
             <p className="text-lg font-extrabold text-foreground mt-1">{awradLabel(preview.count)}</p>
             <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
               الورد الأول: من سورة {surahName(preview.first.from.surah)} آية {ar(preview.first.from.ayah)} إلى سورة{" "}
@@ -161,7 +163,7 @@ export default function KhatmahSetup() {
             onClick={() => (inProgress ? setConfirm(true) : start())}
             data-testid="create-khatmah"
           >
-            ابدأ الختمة
+            {startJuz === 1 ? "ابدأ الختمة" : "ابدأ خطة القراءة"}
           </button>
         </section>
       </div>

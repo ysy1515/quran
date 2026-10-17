@@ -94,7 +94,7 @@ function ProgressBlock() {
     <section className="mt-8" aria-labelledby="khatmah-progress-title">
       <div className="flex items-baseline justify-between mb-3">
         <h2 id="khatmah-progress-title" className="text-lg font-bold text-foreground">
-          الختمة الحالية
+          {k.fullPlan ? "الختمة الحالية" : `خطة القراءة من ${juzLabel(k.plan!.startJuz)}`}
         </h2>
         <span className="text-sm font-bold text-muted-foreground">{ar(pct)}٪</span>
       </div>
@@ -177,9 +177,13 @@ function FinishedKhatmah() {
       <div className="mx-auto w-16 h-16 rounded-full grid place-items-center btn-gold">
         <Icon name="check" size={32} strokeWidth={2.4} />
       </div>
-      <h2 className="text-xl font-extrabold text-foreground mt-4">أتممت الختمة</h2>
+      <h2 className="text-xl font-extrabold text-foreground mt-4">{k.fullPlan ? "أتممت الختمة" : "أتممت خطة القراءة"}</h2>
       {last && <p className="text-sm text-muted-foreground mt-1">في {shortDate(last.completedAt)}</p>}
-      <p className="text-sm text-muted-foreground mt-3">تقبّل الله منك. يمكنك بدء ختمة جديدة متى شئت.</p>
+      <p className="text-sm text-muted-foreground mt-3">
+        {k.fullPlan
+          ? "تقبّل الله منك. يمكنك بدء ختمة جديدة متى شئت."
+          : `قرأت من ${juzLabel(k.plan!.startJuz)} إلى آخر المصحف. تُسجّل خطة قراءة مكتملة، ولا تُحسب ختمة كاملة لأنها لم تبدأ من أول المصحف.`}
+      </p>
       <div className="grid grid-cols-2 gap-3 mt-5">
         <Link href="/khatmah/new" className="btn btn-primary">
           ختمة جديدة
@@ -210,7 +214,9 @@ export default function Home() {
     const done = k.current.index;
     completeCurrentPortion();
     hapticSuccess();
-    toast.success(k.completed + 1 === k.total ? "أتممت الختمة، تقبّل الله منك" : `تم تسجيل الورد ${ar(done + 1)}`, {
+    const last = k.completed + 1 === k.total;
+    const doneText = k.fullPlan ? "أتممت الختمة، تقبّل الله منك" : "أتممت خطة القراءة، تقبّل الله منك";
+    toast.success(last ? doneText : `تم تسجيل الورد ${ar(done + 1)}`, {
       action: { label: "تراجع", onClick: () => undoLastPortion() },
     });
   };

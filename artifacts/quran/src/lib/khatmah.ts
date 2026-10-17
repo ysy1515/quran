@@ -14,8 +14,9 @@ import {
 } from "@workspace/quran-meta";
 import { createLocalStore, useLocalStore } from "./localStore";
 
-// A khatmah is a plan to read the whole Quran (or from a chosen juz to the end)
-// in a fixed number of portions ("awrad"). Everything is stored on this device.
+// A khatmah is a plan to read the whole Quran in a fixed number of portions
+// ("awrad"). A plan may also start from a later juz; finishing that is recorded
+// as a completed reading plan, never as a full khatmah. Everything is stored on this device.
 // Portions are computed from Mushaf numbering only; no Quran text is stored here.
 
 export type PlanUnit = "rub" | "page";
@@ -39,6 +40,8 @@ export interface CompletedKhatmah {
   startedAt: string;
   completedAt: string;
   portions: number;
+  /** Juz the finished plan started from. Only 1 is a full khatmah; later juz are partial reading plans. */
+  startJuz: number;
 }
 
 export interface KhatmahState {
@@ -99,10 +102,16 @@ export function parseKhatmahState(raw: unknown): KhatmahState | null {
   // An unreadable plan is dropped on its own so finished khatmas stay in history.
   const plan = raw.plan == null ? null : parsePlan(raw.plan);
   const history = Array.isArray(raw.history)
-    ? raw.history.filter(
-        (h): h is CompletedKhatmah =>
-          isObj(h) && isIso(h.startedAt) && isIso(h.completedAt) && int(h.portions, 1, PAGE_COUNT) != null,
-      )
+    ? raw.history.flatMap((h): CompletedKhatmah[] => {
+        if (!isObj(h) || !isIso(h.startedAt) || !isIso(h.completedAt)) return [];
+        const portions = int(h.portions, 1, PAGE_COUNT);
+        if (portions == null) return [];
+        // Entries written before startJuz was recorded only came from this unreleased branch's
+        // whole-Quran default; keep them rather than drop a user's history.
+        const startJuz = h.startJuz === undefined ? 1 : int(h.startJuz, 1, JUZ_COUNT);
+        if (startJuz == null) return [];
+        return [{ startedAt: h.startedAt, completedAt: h.completedAt, portions, startJuz }];
+      })
     : [];
   return { plan, history };
 }
@@ -222,7 +231,7 @@ export function completeCurrentPortion(now = new Date()) {
     const plan = { ...s.plan, completions };
     const history =
       completions.length === total
-        ? [...s.history, { startedAt: plan.startedAt, completedAt: now.toISOString(), portions: total }]
+        ? [...s.history, { startedAt: plan.startedAt, completedAt: now.toISOString(), portions: total, startJuz: plan.startJuz }]
         : s.history;
     return { plan, history };
   });
@@ -245,6 +254,33 @@ export function endKhatmah() {
   khatmahStore.update((s) => ({ ...s, plan: null }));
 }
 
+// ── Full khatmah vs partial plan ─────────────────────────────────────────────
+
+/** A plan counts as a full khatmah only when it covers the whole Mushaf from Juz 1. */
+export function isFullKhatmah(p: { startJuz: number }): boolean {
+  return p.startJuz === 1;
+}
+
+export interface KhatmahStats {
+  /** Finished whole-Quran khatmas. */
+  fullCount: number;
+  /** Finished plans that started after Juz 1 (not counted as a khatmah). */
+  partialCount: number;
+  lastFull: CompletedKhatmah | null;
+  lastPartial: CompletedKhatmah | null;
+}
+
+export function khatmahStats(history: CompletedKhatmah[]): KhatmahStats {
+  const full = history.filter(isFullKhatmah);
+  const partial = history.filter((h) => !isFullKhatmah(h));
+  return {
+    fullCount: full.length,
+    partialCount: partial.length,
+    lastFull: full.at(-1) ?? null,
+    lastPartial: partial.at(-1) ?? null,
+  };
+}
+
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 export interface KhatmahView {
@@ -254,13 +290,18 @@ export interface KhatmahView {
   completed: number;
   upcoming: number;
   finished: boolean;
+  /** The current plan covers the whole Mushaf (starts at Juz 1). */
+  fullPlan: boolean;
   current: Portion | null;
   progress: number; // 0..1
+  stats: KhatmahStats;
 }
 
 export function summarize(state: KhatmahState): KhatmahView {
   const { plan, history } = state;
-  if (!plan) return { plan, history, total: 0, completed: 0, upcoming: 0, finished: false, current: null, progress: 0 };
+  const stats = khatmahStats(history);
+  if (!plan)
+    return { plan, history, total: 0, completed: 0, upcoming: 0, finished: false, fullPlan: false, current: null, progress: 0, stats };
   const total = portionCount(plan);
   const completed = plan.completions.length;
   const finished = completed >= total;
@@ -271,8 +312,10 @@ export function summarize(state: KhatmahState): KhatmahView {
     completed,
     upcoming: finished ? 0 : total - completed - 1,
     finished,
+    fullPlan: isFullKhatmah(plan),
     current: finished ? null : portionAt(plan, completed),
     progress: total ? completed / total : 0,
+    stats,
   };
 }
 
