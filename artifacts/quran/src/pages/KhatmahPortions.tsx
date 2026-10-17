@@ -4,7 +4,7 @@ import { surahName } from "@workspace/quran-meta";
 import Screen from "@/components/shell/Screen";
 import { ListSection, ListRow } from "@/components/kit/List";
 import { portionAt, useKhatmah } from "@/lib/khatmah";
-import { ar, shortDate } from "@/lib/format";
+import { ar, awradLabel, shortDate } from "@/lib/format";
 import { readerHref } from "@/lib/useQuranLinks";
 
 const PAGE_LIMIT = 300;
@@ -41,8 +41,8 @@ export default function KhatmahPortions() {
         )}
         {rows.length > 0 && (
           <ListSection
-            title={previous ? `${ar(k.completed)} وردًا مكتملًا` : `${ar(k.total - k.completed)} وردًا متبقيًا`}
-            footer={rows.length === PAGE_LIMIT ? `تُعرض أول ${ar(PAGE_LIMIT)} وردًا.` : undefined}
+            title={previous ? `المكتملة: ${awradLabel(k.completed)}` : `المتبقية: ${awradLabel(k.total - k.completed)}`}
+            footer={rows.length === PAGE_LIMIT ? `تُعرض أول ${awradLabel(PAGE_LIMIT)}.` : undefined}
           >
             {rows.map(({ portion: p, doneAt }) => (
               <ListRow

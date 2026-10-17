@@ -96,8 +96,8 @@ export function parsePlan(raw: unknown): KhatmahPlan | null {
 
 export function parseKhatmahState(raw: unknown): KhatmahState | null {
   if (!isObj(raw)) return null;
+  // An unreadable plan is dropped on its own so finished khatmas stay in history.
   const plan = raw.plan == null ? null : parsePlan(raw.plan);
-  if (raw.plan != null && plan == null) return null;
   const history = Array.isArray(raw.history)
     ? raw.history.filter(
         (h): h is CompletedKhatmah =>

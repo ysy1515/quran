@@ -91,9 +91,9 @@ export default function Dhikr() {
           aria-label={`الذكر الحالي ${preset.text}، اضغط لتغييره`}
           data-testid="dhikr-preset"
         >
-          <p className="font-quran text-[1.7rem] leading-[1.9] text-foreground">{preset.text}</p>
+          <p className="font-quran text-center text-[1.7rem] leading-[1.9] text-foreground">{preset.text}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            {preset.virtue} · <span dir="ltr">{preset.transliteration}</span>
+            {preset.virtue}، <span dir="ltr">{preset.transliteration}</span>
           </p>
         </button>
 
@@ -168,7 +168,7 @@ export default function Dhikr() {
                 <span className="list-row__body">
                   <span className="list-row__label block font-quran text-lg">{p.text}</span>
                   <span className="list-row__hint block">
-                    {p.virtue} · الهدف {ar(p.target)}
+                    {p.virtue}، الهدف {ar(p.target)}
                   </span>
                 </span>
                 {active && <Icon name="checkCircle" size={22} className="text-primary dark:text-gold" />}

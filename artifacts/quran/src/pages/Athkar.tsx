@@ -21,10 +21,11 @@ interface Tile {
 // Layout follows the reference: two wide tiles, then a two-column grid.
 // Categories marked "coming soon" in the data have no content yet, so they get
 // no tile (an empty tile would be a dead control).
-const LAYOUT: { id: string; art: FeatureArtName; tone: Tile["tone"]; wide?: boolean }[] = [
+// `short` is the tile label where the full category title is too long for a tile.
+const LAYOUT: { id: string; art: FeatureArtName; tone: Tile["tone"]; wide?: boolean; short?: string }[] = [
   { id: "morning", art: "morning", tone: 1, wide: true },
   { id: "evening", art: "evening", tone: 2, wide: true },
-  { id: "post-prayer", art: "post-prayer", tone: 3 },
+  { id: "post-prayer", art: "post-prayer", tone: 3, short: "بعد الصلاة" },
   { id: "sleep", art: "sleep", tone: 4 },
   { id: "istighfar", art: "istighfar", tone: 2 },
   { id: "praise", art: "praise", tone: 5 },
@@ -40,7 +41,7 @@ function TileCard({ tile }: { tile: Tile }) {
       data-testid={`tile-${tile.id}`}
     >
       <span className="tile__art">
-        <FeatureArt name={tile.art} size={tile.wide ? 124 : 96} />
+        <FeatureArt name={tile.art} size={tile.wide ? 104 : 84} />
       </span>
       <span className="tile__title">{tile.title}</span>
       {tile.hint && <span className="tile__hint">{tile.hint}</span>}
@@ -59,7 +60,7 @@ export default function Athkar() {
     for (const l of LAYOUT) {
       const c = byId.get(l.id);
       if (!c || c.comingSoon || c.items.length === 0) continue;
-      list.push({ id: c.id, href: `/athkar/${c.id}`, title: c.title, art: l.art, tone: l.tone, wide: l.wide });
+      list.push({ id: c.id, href: `/athkar/${c.id}`, title: l.short ?? c.title, art: l.art, tone: l.tone, wide: l.wide });
     }
     list.push({
       id: "tasbeeh",
@@ -131,7 +132,7 @@ export default function Athkar() {
           </div>
         )}
         <p className="mx-4 mt-4 text-center text-xs text-muted-foreground leading-relaxed">
-          الأذكار مستمدة من الأحاديث النبوية الصحيحة · للمزيد راجع كتب الأذكار المعتمدة
+          الأذكار مستمدة من الأحاديث النبوية الصحيحة، للمزيد راجع كتب الأذكار المعتمدة
         </p>
       </div>
     </Screen>

@@ -44,10 +44,10 @@ function Countdown({ target, now }: { target: Date; now: Date }) {
       aria-label={`${h} ساعة و ${m} دقيقة و ${s} ثانية`}
       data-testid="prayer-countdown"
     >
-      <span className="text-[3.75rem] leading-none tracking-tight">
+      <span className="text-[3.25rem] leading-none tracking-tight">
         {pad(h)}:{pad(m)}
       </span>
-      <span className="text-[1.9rem] leading-none opacity-90">{pad(s)}</span>
+      <span className="text-[1.6rem] leading-none opacity-90">{pad(s)}</span>
     </div>
   );
 }
@@ -153,7 +153,7 @@ export default function Adhan() {
       ]}
       headerExtra={
         <div className="relative z-[1]">
-          <div className="text-center pt-4 pb-7 px-4" data-testid="prayer-hero">
+          <div className="text-center pt-2 pb-5 px-4" data-testid="prayer-hero">
             {coords && next ? (
               <>
                 <p className="text-[1.0625rem] font-bold text-[hsl(var(--header-muted))]">باقي على أذان {next.label}</p>
@@ -171,7 +171,7 @@ export default function Adhan() {
               </>
             )}
           </div>
-          <div className="flex items-center justify-between bg-black/15 px-2 py-2.5">
+          <div className="flex items-center justify-between bg-black/15 px-2 py-1.5">
             <button
               type="button"
               className="header-btn"
@@ -228,21 +228,21 @@ export default function Adhan() {
               return (
                 <li
                   key={p.key}
-                  className={`flex items-center gap-3 px-5 min-h-[64px] border-b border-border/70 last:border-b-0 ${
-                    isNext ? "bg-primary/10 dark:bg-gold/10" : ""
+                  className={`flex items-center gap-3 px-5 min-h-[56px] border-b border-border/70 last:border-b-0 ${
+                    isNext ? "bg-primary/[0.09] dark:bg-gold/10" : ""
                   }`}
                   data-testid={`prayer-${p.key}`}
                   aria-current={isNext ? "time" : undefined}
                 >
                   <span
-                    className={`flex-1 text-[1.1875rem] ${
+                    className={`flex-1 text-[1.125rem] ${
                       isNext ? "font-extrabold text-primary dark:text-gold" : "font-semibold text-foreground"
                     }`}
                   >
                     {p.label}
                   </span>
                   <span
-                    className={`tabular-nums text-[1.1875rem] ${isNext ? "font-extrabold text-primary dark:text-gold" : "text-foreground"}`}
+                    className={`tabular-nums text-[1.125rem] ${isNext ? "font-extrabold text-primary dark:text-gold" : "text-foreground"}`}
                     dir="ltr"
                   >
                     {c.time} <span className="text-base">{c.period}</span>

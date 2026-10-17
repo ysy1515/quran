@@ -3,7 +3,7 @@ import { useSearchQuran, getSearchQuranQueryKey } from "@workspace/api-client-re
 import Screen from "@/components/shell/Screen";
 import { ListRow } from "@/components/kit/List";
 import { Icon } from "@/components/icons/Icon";
-import { ar } from "@/lib/format";
+import { ar, ayatLabel } from "@/lib/format";
 
 export default function Search() {
   const [query, setQuery] = useState("");
@@ -90,7 +90,7 @@ export default function Search() {
                     key={s.id}
                     href={`/mushaf/${s.number}`}
                     label={`${ar(s.number)}. سورة ${s.name}`}
-                    hint={`${s.revelationType === "Meccan" ? "مكية" : "مدنية"} · ${ar(s.versesCount)} آية`}
+                    hint={`${s.revelationType === "Meccan" ? "مكية" : "مدنية"}، ${ayatLabel(s.versesCount)}`}
                   />
                 ))}
               </div>

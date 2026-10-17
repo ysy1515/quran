@@ -7,7 +7,7 @@ import { Icon } from "@/components/icons/Icon";
 import FeatureArt from "@/components/art/FeatureArt";
 import { completeCurrentPortion, isWithin, undoLastPortion, useKhatmah, type Portion } from "@/lib/khatmah";
 import { useReadingProgress } from "@/lib/userData";
-import { ar, juzLabel, shortDate } from "@/lib/format";
+import { ar, awradLabel, juzLabel, shortDate } from "@/lib/format";
 import { readerHref } from "@/lib/useQuranLinks";
 import { shareOrCopy } from "@/lib/share";
 import { hapticSuccess } from "@/lib/haptics";
@@ -44,8 +44,12 @@ function AyahPreview({ portion }: { portion: Portion }) {
   const second = verses[start + 1];
   if (second && first.text.length < 70 && second.verseKey.startsWith(`${portion.from.surah}:`)) shown.push(second);
 
+  // Long opening ayat get a smaller size so the card keeps its shape.
+  const length = shown.reduce((n, v) => n + v.text.length, 0);
+  const size = length <= 90 ? "text-[1.45rem]" : length <= 220 ? "text-[1.25rem]" : "text-[1.1rem]";
+
   return (
-    <p className="font-quran text-center text-foreground py-6 px-1 text-[1.45rem] leading-[2.3]" dir="rtl" data-testid="wird-preview">
+    <p className={`font-quran text-center text-foreground py-5 px-1 leading-[2.25] ${size}`} dir="rtl" data-testid="wird-preview">
       <span className="text-gold-deep">﴿</span>
       {shown.map((v) => (
         <span key={v.verseKey}>
@@ -100,7 +104,7 @@ function ProgressBlock() {
         aria-valuemin={0}
         aria-valuemax={k.total}
         aria-valuenow={k.completed}
-        aria-valuetext={`${ar(k.completed)} من ${ar(k.total)} وردًا`}
+        aria-valuetext={`${ar(k.completed)} من ${awradLabel(k.total)}`}
         data-testid="khatmah-progress"
       >
         <div
@@ -138,7 +142,7 @@ function ContinueReading() {
       <span className="flex-1 min-w-0">
         <span className="block text-xs font-bold text-muted-foreground">متابعة القراءة من آخر موضع</span>
         <span className="block text-base font-bold text-foreground truncate">
-          سورة {progress.lastSurahName} · آية {ar(progress.lastVerseNumber)}
+          سورة {progress.lastSurahName}، آية {ar(progress.lastVerseNumber)}
         </span>
         <span className="block text-xs text-muted-foreground">صفحة {ar(progress.lastPageNumber)}</span>
       </span>
@@ -237,11 +241,11 @@ export default function Home() {
         {k.current && (
           <>
             <WirdCard portion={k.current} />
-            <div className="grid grid-cols-[1.45fr_1fr] gap-3 mt-5">
+            <div className="grid grid-cols-[1.25fr_1fr] gap-3 mt-5">
               <Link href={continueHref} className="btn btn-primary" data-testid="continue-wird">
                 تابع قراءة الورد
               </Link>
-              <button type="button" className="btn btn-gold" onClick={finish} data-testid="finish-wird">
+              <button type="button" className="btn btn-gold whitespace-nowrap !px-3" onClick={finish} data-testid="finish-wird">
                 أتممت القراءة
                 <Icon name="check" size={20} strokeWidth={2.4} />
               </button>

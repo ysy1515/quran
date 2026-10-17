@@ -44,8 +44,8 @@ export default function Bookmarks() {
               icon="pin"
               gold
               href={readerHref({ surah: stop.surahNumber, ayah: stop.verseNumber })}
-              label={`سورة ${stop.surahName} · آية ${ar(stop.verseNumber)}`}
-              hint={`صفحة ${ar(stop.pageNumber)} · ${shortDate(stop.createdAt)}`}
+              label={`سورة ${stop.surahName}، آية ${ar(stop.verseNumber)}`}
+              hint={`صفحة ${ar(stop.pageNumber)}، ${shortDate(stop.createdAt)}`}
               trailing={
                 <RemoveButton
                   label="مسح موضع التوقف"
@@ -72,8 +72,8 @@ export default function Bookmarks() {
                 key={`${b.surahNumber}:${b.verseNumber}`}
                 icon="bookmark"
                 href={readerHref({ surah: b.surahNumber, ayah: b.verseNumber })}
-                label={`سورة ${b.surahName} · آية ${ar(b.verseNumber)}`}
-                hint={`صفحة ${ar(b.pageNumber)} · ${shortDate(b.createdAt)}`}
+                label={`سورة ${b.surahName}، آية ${ar(b.verseNumber)}`}
+                hint={`صفحة ${ar(b.pageNumber)}، ${shortDate(b.createdAt)}`}
                 trailing={<RemoveButton label={`حذف فاصل سورة ${b.surahName} آية ${b.verseNumber}`} onClick={() => remove(b.surahNumber, b.verseNumber)} />}
                 testId={`bookmark-${b.surahNumber}-${b.verseNumber}`}
               />

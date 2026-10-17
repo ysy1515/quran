@@ -17,7 +17,7 @@ import {
   useKhatmah,
   type PlanUnit,
 } from "@/lib/khatmah";
-import { ar, juzLabel } from "@/lib/format";
+import { ar, awradLabel, juzLabel } from "@/lib/format";
 
 type Choice = { kind: "preset"; id: string } | { kind: "custom" };
 
@@ -84,7 +84,7 @@ export default function KhatmahSetup() {
                 <Radio checked={checked} />
                 <span className="list-row__body">
                   <span className="list-row__label block">{p.label}</span>
-                  <span className="list-row__hint block">{ar(count)} وردًا</span>
+                  <span className="list-row__hint block">{awradLabel(count)}</span>
                 </span>
               </button>
             );
@@ -148,7 +148,7 @@ export default function KhatmahSetup() {
         <section className="px-4 mt-6">
           <div className="card px-5 py-4" data-testid="plan-summary">
             <p className="text-sm font-bold text-muted-foreground">ملخص الخطة</p>
-            <p className="text-lg font-extrabold text-foreground mt-1">{ar(preview.count)} وردًا</p>
+            <p className="text-lg font-extrabold text-foreground mt-1">{awradLabel(preview.count)}</p>
             <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
               الورد الأول: من سورة {surahName(preview.first.from.surah)} آية {ar(preview.first.from.ayah)} إلى سورة{" "}
               {surahName(preview.first.to.surah)} آية {ar(preview.first.to.ayah)} (صفحة {ar(preview.first.fromPage)}
@@ -171,7 +171,7 @@ export default function KhatmahSetup() {
         onClose={() => setConfirm(false)}
         onConfirm={start}
         title="استبدال الختمة الحالية؟"
-        message={`أتممت ${ar(current.completed)} من ${ar(current.total)} وردًا في الختمة الحالية. ستبدأ الختمة الجديدة من أولها، وتبقى ختماتك المكتملة السابقة في الإحصائيات.`}
+        message={`أتممت ${ar(current.completed)} من ${awradLabel(current.total)} في الختمة الحالية. ستبدأ الختمة الجديدة من أولها، وتبقى ختماتك المكتملة السابقة في الإحصائيات.`}
         confirmLabel="ابدأ الجديدة"
         danger
       />

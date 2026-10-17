@@ -25,7 +25,7 @@ import { addReadingSeconds } from "@/lib/readingTime";
 import { copyToClipboard, formatAyahForCopy } from "@/lib/clipboard";
 import { shareOrCopy } from "@/lib/share";
 import { hapticSuccess, hapticTap } from "@/lib/haptics";
-import { ar, juzLabel } from "@/lib/format";
+import { ar, ayatLabel, juzLabel } from "@/lib/format";
 import { readerHref } from "@/lib/useQuranLinks";
 
 /** Counts visible time on this screen into the reading-time statistic. */
@@ -221,7 +221,7 @@ export default function Mushaf() {
   return (
     <Screen
       title={`سورة ${name}`}
-      subtitle={`${juzLabel(juzOfAyah(surahNumber, visibleAyah))} · صفحة ${ar(page)}`}
+      subtitle={`${juzLabel(juzOfAyah(surahNumber, visibleAyah))}، صفحة ${ar(page)}`}
       back="/index"
       endActions={[
         { label: "إعدادات القراءة", icon: <Icon name="textSize" size={24} />, onClick: () => setSettingsOpen(true), testId: "reader-settings" },
@@ -245,7 +245,7 @@ export default function Mushaf() {
       )}
 
       {wird && (
-        <div className="sticky top-0 z-10 flex items-center gap-3 px-4 py-2.5 bg-[hsl(var(--gold)/0.16)] backdrop-blur border-b border-gold/30 text-sm" data-testid="wird-banner">
+        <div className="sticky top-0 z-10 flex items-center gap-3 px-4 py-2.5 bg-[linear-gradient(hsl(var(--gold)/0.16),hsl(var(--gold)/0.16)),linear-gradient(hsl(var(--background)),hsl(var(--background)))] border-b border-gold/30 text-sm shadow-[var(--elev-1)]" data-testid="wird-banner">
           <span className="flex-1 min-w-0 font-bold text-foreground truncate">
             الورد {ar(wird.index + 1)}: إلى سورة {surahName(wird.to.surah)} آية {ar(wird.to.ayah)}
           </span>
@@ -262,7 +262,7 @@ export default function Mushaf() {
           <p className="font-quran text-2xl text-foreground mb-1">سورة {name}</p>
           {surah && (
             <p className="text-sm text-muted-foreground">
-              {surah.revelationType === "Meccan" ? "مكية" : "مدنية"} · {ar(surah.versesCount)} آية
+              {surah.revelationType === "Meccan" ? "مكية" : "مدنية"}، {ayatLabel(surah.versesCount)}
             </p>
           )}
           {shouldShowBasmalahHeader(surahNumber) && (
@@ -365,7 +365,7 @@ export default function Mushaf() {
         )}
       </div>
 
-      <Sheet open={!!actionVerse} onClose={() => setActionVerse(null)} title={actionVerse ? `سورة ${name} · الآية ${ar(actionVerse.verseNumber)}` : undefined}>
+      <Sheet open={!!actionVerse} onClose={() => setActionVerse(null)} title={actionVerse ? `سورة ${name}، الآية ${ar(actionVerse.verseNumber)}` : undefined}>
         {actionVerse && (
           <>
             <p className="font-quran text-foreground leading-loose text-lg bg-muted/60 rounded-2xl px-4 py-3 mb-4 max-h-40 overflow-y-auto" dir="rtl">

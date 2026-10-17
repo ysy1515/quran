@@ -67,12 +67,36 @@ export function shortDate(iso: string): string {
 }
 
 /** Minutes → "ساعتان و ١٥ دقيقة"-style compact label. */
+function counted(n: number, one: string, two: string, few: string, many: string): string {
+  if (n === 1) return one;
+  if (n === 2) return two;
+  const mod = n % 100;
+  return `${ar(n)} ${mod >= 3 && mod <= 10 ? few : many}`;
+}
+
 export function durationLabel(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   if (minutes < 1) return "أقل من دقيقة";
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (h === 0) return `${ar(m)} دقيقة`;
-  if (m === 0) return `${ar(h)} ساعة`;
-  return `${ar(h)} ساعة و${ar(m)} دقيقة`;
+  const hours = counted(h, "ساعة واحدة", "ساعتان", "ساعات", "ساعة");
+  const mins = counted(m, "دقيقة واحدة", "دقيقتان", "دقائق", "دقيقة");
+  if (h === 0) return mins;
+  if (m === 0) return hours;
+  return `${hours} و${mins}`;
+}
+
+/** "٧ آيات", "٢٨٦ آية": Arabic plural agreement for an ayah count. */
+export function ayatLabel(n: number): string {
+  return counted(n, "آية واحدة", "آيتان", "آيات", "آية");
+}
+
+/** "٣ أوراد", "٣٠ وردًا", "٢٤٠ وردًا", "١٠٠ ورد". */
+export function awradLabel(n: number): string {
+  if (n === 1) return "ورد واحد";
+  if (n === 2) return "وردان";
+  const mod = n % 100;
+  if (mod >= 3 && mod <= 10) return `${ar(n)} أوراد`;
+  if (mod >= 11) return `${ar(n)} وردًا`;
+  return `${ar(n)} ورد`;
 }

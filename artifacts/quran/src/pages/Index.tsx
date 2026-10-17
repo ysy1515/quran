@@ -12,7 +12,7 @@ import {
 import Screen from "@/components/shell/Screen";
 import { Segmented } from "@/components/kit/List";
 import { Icon } from "@/components/icons/Icon";
-import { ar, juzLabel } from "@/lib/format";
+import { ar, ayatLabel, juzLabel } from "@/lib/format";
 import { readerHref } from "@/lib/useQuranLinks";
 
 type Tab = "surahs" | "juz";
@@ -114,14 +114,14 @@ export default function IndexPage() {
             <div className="list-group mt-4" data-testid="surah-list">
               {surahs.map((s) => {
                 const rev = revelationOf.get(s.number);
-                const revLabel = rev === "Meccan" ? "مكية · " : rev === "Medinan" ? "مدنية · " : "";
+                const revLabel = rev === "Meccan" ? "مكية، " : rev === "Medinan" ? "مدنية، " : "";
                 return (
                   <Row
                     key={s.number}
                     href={`/mushaf/${s.number}`}
                     number={s.number}
                     title={`سورة ${s.name}`}
-                    hint={`${revLabel}${ar(s.ayahs)} آية`}
+                    hint={`${revLabel}${ayatLabel(s.ayahs)}`}
                     page={s.page}
                     testId={`surah-${s.number}`}
                   />

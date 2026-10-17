@@ -219,13 +219,16 @@
   }
 }
 
-/* Quranic text */
-.font-quran {
-  font-family: var(--app-font-quran);
-  font-feature-settings: "liga" 1, "calt" 1;
-  direction: rtl;
-  text-align: right;
-  line-height: 2.2;
+/* Quranic text. In the components layer so utilities (text-center, leading-*)
+   can override the defaults. */
+@layer components {
+  .font-quran {
+    font-family: var(--app-font-quran);
+    font-feature-settings: "liga" 1, "calt" 1;
+    direction: rtl;
+    text-align: right;
+    line-height: 2.2;
+  }
 }
 
 /* Verse hover effect */
@@ -430,6 +433,8 @@
 }
 .app-header__title h1 {
   font-size: 1.125rem;
+  /* Tall enough that overflow clipping never cuts the dots under a final yeh. */
+  line-height: 1.6;
   font-weight: 700;
   margin: 0;
   white-space: nowrap;
@@ -565,6 +570,25 @@
 .dark .segmented button[aria-selected="true"] {
   color: hsl(var(--gold));
 }
+/* On light surfaces (screen body, sheets) */
+.screen__body .segmented,
+.sheet .segmented {
+  margin: 0;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+}
+.screen__body .segmented button,
+.sheet .segmented button {
+  color: hsl(var(--muted-foreground));
+}
+.screen__body .segmented button[aria-selected="true"],
+.sheet .segmented button[aria-selected="true"] {
+  color: hsl(var(--primary));
+}
+.dark .screen__body .segmented button[aria-selected="true"],
+.dark .sheet .segmented button[aria-selected="true"] {
+  color: hsl(var(--gold));
+}
 
 /* ───────────────────────── Surfaces ───────────────────────── */
 .card {
@@ -671,8 +695,8 @@
   align-items: center;
   gap: 14px;
   width: 100%;
-  min-height: 60px;
-  padding: 8px 16px;
+  min-height: 54px;
+  padding: 7px 16px;
   text-align: right;
   position: relative;
   color: hsl(var(--foreground));
@@ -716,8 +740,8 @@ a.list-row:active {
   min-width: 0;
 }
 .list-row__label {
-  font-size: 1.0625rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 600;
   line-height: 1.4;
 }
 .list-row__hint {
@@ -739,11 +763,13 @@ a.list-row:active {
   opacity: 0.5;
 }
 .badge-count {
-  min-width: 44px;
-  padding: 2px 10px;
+  display: inline-block;
+  min-width: 34px;
+  padding: 1px 8px;
   border-radius: 8px;
   text-align: center;
-  font-weight: 800;
+  font-size: 0.875rem;
+  font-weight: 700;
   color: hsl(var(--primary-foreground));
   background: hsl(var(--primary));
 }
@@ -848,7 +874,7 @@ a.list-row:active {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  min-height: 168px;
+  min-height: 150px;
   padding: 14px 16px;
   border-radius: 24px;
   overflow: hidden;
@@ -890,7 +916,8 @@ a.list-row:active {
 }
 .tile--wide {
   grid-column: 1 / -1;
-  min-height: 176px;
+  min-height: 132px;
+  justify-content: center;
 }
 .tile__art {
   position: absolute;
@@ -915,7 +942,7 @@ a.list-row:active {
   font-weight: 800;
   line-height: 1.35;
   text-shadow: 0 1px 2px hsl(156 50% 4% / 0.45);
-  max-width: 70%;
+  max-width: 85%;
 }
 .tile--wide .tile__title {
   font-size: 1.375rem;
