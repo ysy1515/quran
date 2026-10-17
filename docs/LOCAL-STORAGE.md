@@ -14,7 +14,13 @@ uses `localStorage` inside the Capacitor WebView.
 | `quran.pushOwnership.v1` | push manage token | low (see below) |
 | `push-prefs` | push preferences (legacy key) | low |
 | `adhan_prefs`, `adhan_coords` | prayer method, madhab, location | low, re-detected |
-| `dhikr-state` | dhikr counter sessions | medium |
+| `dhikr-state` | tasbeeh: chosen dhikr, target, finished rounds, current count | medium |
+| `quran.khatmah.v1` | current khatmah plan, completed portions, finished khatmas | high |
+| `quran.bookmarks.v1` | multiple bookmarks (الفواصل) | medium |
+| `quran.favorites.v1` | favourite ayat, with the ayah text as received from the API | medium |
+| `quran.reminders.v1` | daily reminders on/off and time (native notifications 2001–2005) | low |
+| `quran.readingTime.v1` | seconds spent with the Mushaf open | low |
+| `quran.adhanPlace.v1` | city name for the saved prayer location | low, re-detected |
 
 All `quran.*.v1` values are validated on read (`createLocalStore`), so corrupt or
 missing data falls back to defaults instead of crashing.
