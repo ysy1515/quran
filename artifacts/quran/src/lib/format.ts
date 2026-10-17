@@ -63,10 +63,10 @@ export function sameDay(a: Date, b: Date): boolean {
 export function shortDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("ar", { day: "numeric", month: "long", year: "numeric", numberingSystem: "latn" });
+  // Arabic-Indic digits, matching the page and ayah numbers shown beside dates.
+  return d.toLocaleDateString("ar", { day: "numeric", month: "long", year: "numeric", numberingSystem: "arab" });
 }
 
-/** Minutes → "ساعتان و ١٥ دقيقة"-style compact label. */
 function counted(n: number, one: string, two: string, few: string, many: string): string {
   if (n === 1) return one;
   if (n === 2) return two;
