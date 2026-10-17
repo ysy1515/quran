@@ -30,7 +30,8 @@ const config: CapacitorConfig = {
   },
   ios: {
     backgroundColor: "#1a4731",
-    contentInset: "automatic",
+    // The web layer draws edge to edge and pads itself with env(safe-area-inset-*).
+    contentInset: "never",
     limitsNavigationsToAppBoundDomains: true,
   },
   server: {

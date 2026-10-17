@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { Component, type ReactNode } from "react";
 import { setBaseUrl } from "@workspace/api-client-react";
 import App from "./App";
+import "./fonts";
 import "./index.css";
 
 declare const __MOBILE_API_BASE_URL__: string;

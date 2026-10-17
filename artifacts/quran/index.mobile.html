@@ -54,18 +54,7 @@
       @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 
-    <!--
-      Google Fonts loaded non-blocking via preload + JS.
-      If network is unavailable (Capacitor offline startup),
-      fonts fall back to system Arabic fonts without blocking render.
-    -->
-    <link rel="preload" as="style"
-      href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Cairo:wght@400;500;600;700;800&family=Scheherazade+New:wght@400;700&display=swap"
-      onload="this.rel='stylesheet'" />
-    <noscript>
-      <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Cairo:wght@400;500;600;700;800&family=Scheherazade+New:wght@400;700&display=swap" />
-    </noscript>
+    <!-- Fonts (Cairo, Amiri Quran) are bundled with the app, so they work offline. -->
   </head>
   <body>
     <!--

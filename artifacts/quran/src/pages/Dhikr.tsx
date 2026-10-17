@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useRef, useState } from "react";
+import Screen from "@/components/shell/Screen";
+import Sheet, { ConfirmSheet } from "@/components/kit/Sheet";
+import { Icon } from "@/components/icons/Icon";
+import { chooseDhikr, resetDhikrCount, setDhikrTarget, tapDhikr, useDhikrState } from "@/lib/dhikr";
+import { hapticSuccess, hapticTap } from "@/lib/haptics";
+import { ar } from "@/lib/format";
 
 interface DhikrPreset {
   text: string;
@@ -7,7 +13,7 @@ interface DhikrPreset {
   virtue: string;
 }
 
-const PRESETS: DhikrPreset[] = [
+export const PRESETS: DhikrPreset[] = [
   { text: "سُبْحَانَ اللَّهِ", transliteration: "Subhan Allah", target: 33, virtue: "تسبيح" },
   { text: "الْحَمْدُ لِلَّهِ", transliteration: "Alhamdulillah", target: 33, virtue: "تحميد" },
   { text: "اللَّهُ أَكْبَرُ", transliteration: "Allahu Akbar", target: 34, virtue: "تكبير" },
@@ -20,352 +26,187 @@ const PRESETS: DhikrPreset[] = [
 
 const TARGETS = [33, 34, 99, 100, 1000];
 
-function ProgressRing({ count, target, size = 280 }: { count: number; target: number; size?: number }) {
-  const stroke = 8;
-  const radius = (size - stroke * 2) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const progress = Math.min(count / target, 1);
-  const offset = circumference * (1 - progress);
-
+function ProgressRing({ progress }: { progress: number }) {
+  const r = 46;
+  const c = 2 * Math.PI * r;
   return (
-    <svg width={size} height={size} className="absolute inset-0" style={{ transform: "rotate(-90deg)" }}>
-      {/* Background track */}
+    <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full -rotate-90" aria-hidden="true">
+      <circle cx="50" cy="50" r={r} fill="none" strokeWidth="3.2" className="stroke-border" />
       <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
+        cx="50"
+        cy="50"
+        r={r}
         fill="none"
-        stroke="currentColor"
-        strokeWidth={stroke}
-        className="text-border"
-        opacity={0.3}
-      />
-      {/* Progress arc */}
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={stroke}
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
+        strokeWidth="3.2"
         strokeLinecap="round"
-        className="text-primary transition-all duration-300 ease-out"
+        strokeDasharray={c}
+        strokeDashoffset={c * (1 - progress)}
+        className="stroke-gold transition-[stroke-dashoffset] duration-300 ease-out"
       />
     </svg>
   );
 }
 
 export default function Dhikr() {
-  const [count, setCount] = useState(0);
-  const [preset, setPreset] = useState(PRESETS[0]);
-  const [target, setTarget] = useState(33);
-  const [showPresets, setShowPresets] = useState(false);
-  const [showTargets, setShowTargets] = useState(false);
-  const [tapping, setTapping] = useState(false);
-  const [completed, setCompleted] = useState(false);
-  const [sessions, setSessions] = useState(0);
-  const tapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const completedRef = useRef(false);
+  const state = useDhikrState();
+  const preset = PRESETS.find((p) => p.text === state.presetText) ?? { ...PRESETS[0]!, text: state.presetText };
+  const [sheet, setSheet] = useState<"presets" | "targets" | "reset" | null>(null);
+  const [celebrate, setCelebrate] = useState(false);
+  const celebrateTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Load state from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("dhikr-state");
-    if (saved) {
-      try {
-        const s = JSON.parse(saved);
-        if (s.presetText) {
-          const found = PRESETS.find((p) => p.text === s.presetText);
-          if (found) setPreset(found);
-        }
-        if (s.target) setTarget(s.target);
-        if (s.sessions) setSessions(s.sessions);
-      } catch { /* corrupt saved state: keep defaults */ }
-    }
-  }, []);
-
-  // Save state
-  useEffect(() => {
-    localStorage.setItem("dhikr-state", JSON.stringify({ presetText: preset.text, target, sessions }));
-  }, [preset, target, sessions]);
-
-  const vibrate = () => {
-    if ("vibrate" in navigator) {
-      navigator.vibrate(30);
-    }
-  };
-
-  const handleTap = useCallback(() => {
-    if (tapping) return;
-
-    vibrate();
-    setTapping(true);
-
-    if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-    tapTimeoutRef.current = setTimeout(() => setTapping(false), 150);
-
-    setCount((prev) => {
-      const next = prev + 1;
-      if (next >= target && !completedRef.current) {
-        completedRef.current = true;
-        setCompleted(true);
-        setSessions((s) => s + 1);
-        if ("vibrate" in navigator) navigator.vibrate([60, 40, 60, 40, 100]);
-        setTimeout(() => {
-          setCompleted(false);
-          completedRef.current = false;
-        }, 2000);
-      }
-      return next;
-    });
-  }, [target, tapping]);
-
-  const handleReset = () => {
-    setCount(0);
-    setCompleted(false);
-    completedRef.current = false;
-  };
-
-  const handleSelectPreset = (p: DhikrPreset) => {
-    setPreset(p);
-    setTarget(p.target);
-    setCount(0);
-    setCompleted(false);
-    completedRef.current = false;
-    setShowPresets(false);
-  };
-
-  const handleSelectTarget = (t: number) => {
-    setTarget(t);
-    setCount(0);
-    setCompleted(false);
-    completedRef.current = false;
-    setShowTargets(false);
-  };
-
+  const { count, target, sessions } = state;
   const progress = Math.min(count / target, 1);
-  const percentage = Math.round(progress * 100);
   const remaining = Math.max(target - count, 0);
 
+  const tap = () => {
+    if (tapDhikr()) {
+      hapticSuccess();
+      setCelebrate(true);
+      clearTimeout(celebrateTimer.current);
+      celebrateTimer.current = setTimeout(() => setCelebrate(false), 1600);
+    } else {
+      hapticTap();
+    }
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-background select-none" dir="rtl">
-      {/* Header */}
-      <div className="px-5 pt-6 pb-4 flex items-center justify-between flex-shrink-0">
-        <h1 className="font-quran text-xl font-bold text-foreground">عداد الأذكار</h1>
-        <div className="flex items-center gap-2">
-          {sessions > 0 && (
-            <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold">
-              {sessions} دورة
-            </div>
-          )}
-          <button
-            onClick={handleReset}
-            className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-border transition-colors active:scale-95"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4 h-4">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* Dhikr Text */}
-      <div className="px-5 text-center mb-2 flex-shrink-0">
+    <Screen
+      title="التسبيح"
+      back="/athkar"
+      endActions={[
+        {
+          label: "تصفير العداد",
+          icon: <Icon name="refresh" size={24} />,
+          onClick: () => (count > 0 ? setSheet("reset") : undefined),
+          testId: "dhikr-reset",
+        },
+      ]}
+      bodyClassName="flex flex-col"
+    >
+      <div className="flex-1 flex flex-col items-center px-5 pt-5 pb-5 select-none min-h-[440px]">
         <button
-          onClick={() => { setShowPresets(true); setShowTargets(false); }}
-          className="inline-block"
+          type="button"
+          onClick={() => setSheet("presets")}
+          className="card press w-full px-5 py-4 text-center"
+          aria-label={`الذكر الحالي ${preset.text}، اضغط لتغييره`}
+          data-testid="dhikr-preset"
         >
-          <p className="font-quran text-2xl font-bold text-foreground leading-relaxed hover:text-primary transition-colors">
-            {preset.text}
+          <p className="font-quran text-center text-[1.7rem] leading-[1.9] text-foreground">{preset.text}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {preset.virtue}، <span dir="ltr">{preset.transliteration}</span>
           </p>
-          <p className="text-xs text-muted-foreground mt-1">{preset.transliteration}</p>
         </button>
-      </div>
 
-      {/* Main Tap Area */}
-      <div className="flex-1 flex items-center justify-center px-6">
-        <div className="relative w-72 h-72 flex items-center justify-center">
-          {/* Progress Ring */}
-          <ProgressRing count={count} target={target} size={288} />
-
-          {/* Tap Button */}
-          <button
-            onPointerDown={handleTap}
-            className={`relative w-52 h-52 rounded-full flex flex-col items-center justify-center cursor-pointer outline-none transition-all duration-150 z-10
-              ${completed
-                ? "bg-primary shadow-lg shadow-primary/30 scale-105"
-                : tapping
-                  ? "bg-primary/90 scale-95 shadow-inner"
-                  : "bg-primary/10 hover:bg-primary/15 active:scale-95 border-2 border-primary/20"
-              }
-            `}
-            style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
-          >
-            {/* Ripple on tap */}
-            {tapping && (
-              <span className="absolute inset-0 rounded-full animate-ping bg-primary/20" />
-            )}
-
-            {/* Completed celebration */}
-            {completed ? (
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-4xl">✓</span>
-                <p className="text-primary-foreground font-bold text-sm">أحسنت!</p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-1">
-                <span
-                  className={`text-6xl font-bold tabular-nums transition-all duration-150 ${
-                    tapping ? "text-primary-foreground scale-110" : "text-primary"
-                  }`}
-                  style={{ fontVariantNumeric: "tabular-nums", direction: "ltr" }}
-                >
-                  {count}
-                </span>
-                {count === 0 && (
-                  <p className={`text-sm font-medium transition-colors ${tapping ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                    اضغط للبدء
-                  </p>
+        <div className="flex-1 w-full grid place-items-center py-5">
+          <div className="relative aspect-square w-[min(74vw,42vh,300px)]">
+            <ProgressRing progress={progress} />
+            <button
+              type="button"
+              onClick={tap}
+              className={`absolute inset-[9%] rounded-full grid place-items-center transition-transform duration-100 active:scale-95 shadow-[var(--elev-3)] ${
+                celebrate
+                  ? "bg-gradient-to-b from-gold to-gold-deep text-[hsl(156_40%_8%)]"
+                  : "bg-gradient-to-b from-[hsl(152_42%_24%)] to-[hsl(156_44%_12%)] text-white"
+              }`}
+              style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
+              aria-label={`سبّح. العدد ${count} من ${target}`}
+              data-testid="dhikr-tap"
+            >
+              <span className="flex flex-col items-center">
+                {celebrate ? (
+                  <>
+                    <Icon name="check" size={48} strokeWidth={2.6} />
+                    <span className="font-bold mt-1">أتممت الدورة</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[4rem] leading-none font-bold tabular-nums" data-testid="dhikr-count">
+                      {ar(count)}
+                    </span>
+                    <span className="text-sm opacity-80 mt-2">{count === 0 ? "اضغط للتسبيح" : `من ${ar(target)}`}</span>
+                  </>
                 )}
-              </div>
-            )}
-          </button>
-
-          {/* Progress % label */}
-          {count > 0 && !completed && (
-            <div className="absolute bottom-0 right-0 text-xs text-muted-foreground font-medium bg-card border border-border rounded-full px-2 py-0.5">
-              {percentage}%
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Stats Row */}
-      <div className="px-6 pb-4 flex items-center justify-center gap-6 text-center flex-shrink-0">
-        <div>
-          <p className="text-2xl font-bold text-foreground" style={{ direction: "ltr" }}>{count}</p>
-          <p className="text-xs text-muted-foreground">العدد</p>
-        </div>
-        <div className="w-px h-8 bg-border" />
-        <div>
-          <button
-            onClick={() => { setShowTargets(true); setShowPresets(false); }}
-            className="text-2xl font-bold text-primary hover:text-primary/80 transition-colors"
-            style={{ direction: "ltr" }}
-          >
-            {target}
-          </button>
-          <p className="text-xs text-muted-foreground">الهدف</p>
-        </div>
-        <div className="w-px h-8 bg-border" />
-        <div>
-          <p className="text-2xl font-bold text-foreground" style={{ direction: "ltr" }}>
-            {remaining}
-          </p>
-          <p className="text-xs text-muted-foreground">المتبقي</p>
-        </div>
-      </div>
-
-      {/* Bottom CTA */}
-      <div className="px-5 pb-6 flex gap-2 flex-shrink-0">
-        <button
-          onClick={() => { setShowPresets(true); setShowTargets(false); }}
-          className="flex-1 py-3 rounded-xl bg-card border border-border text-sm font-medium text-foreground hover:border-primary/30 transition-colors active:scale-95 flex items-center justify-center gap-2"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4 h-4">
-            <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
-            <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
-          </svg>
-          اختر الذكر
-        </button>
-        <button
-          onClick={() => { setShowTargets(true); setShowPresets(false); }}
-          className="flex-1 py-3 rounded-xl bg-card border border-border text-sm font-medium text-foreground hover:border-primary/30 transition-colors active:scale-95 flex items-center justify-center gap-2"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-4 h-4">
-            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          الهدف: {target}
-        </button>
-      </div>
-
-      {/* Presets Sheet */}
-      {showPresets && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowPresets(false)} />
-          <div className="relative bg-card rounded-t-2xl border-t border-border shadow-xl max-h-[70vh] flex flex-col">
-            <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-              <div className="w-12 h-1.5 rounded-full bg-muted-foreground/30" />
-            </div>
-            <div className="px-5 py-3 border-b border-border flex-shrink-0">
-              <h2 className="font-semibold text-foreground text-base">اختر الذكر</h2>
-            </div>
-            <div className="overflow-y-auto flex-1 p-3">
-              {PRESETS.map((p) => (
-                <button
-                  key={p.text}
-                  onClick={() => handleSelectPreset(p)}
-                  className={`w-full flex items-center gap-3 p-3.5 rounded-xl mb-2 text-right transition-all ${
-                    preset.text === p.text
-                      ? "bg-primary/10 border border-primary/30"
-                      : "bg-muted/50 hover:bg-muted border border-transparent"
-                  }`}
-                >
-                  <div className="flex-1">
-                    <p className="font-quran text-base font-bold text-foreground">{p.text}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{p.virtue} • الهدف: {p.target}</p>
-                  </div>
-                  {preset.text === p.text && (
-                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" className="w-3 h-3">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
+              </span>
+            </button>
           </div>
         </div>
-      )}
+        <p className="sr-only" aria-live="polite">
+          {celebrate ? "أتممت الدورة" : count > 0 && count % 10 === 0 ? `${count}` : ""}
+        </p>
 
-      {/* Target Sheet */}
-      {showTargets && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowTargets(false)} />
-          <div className="relative bg-card rounded-t-2xl border-t border-border shadow-xl">
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-12 h-1.5 rounded-full bg-muted-foreground/30" />
-            </div>
-            <div className="px-5 py-3 border-b border-border">
-              <h2 className="font-semibold text-foreground text-base">اختر الهدف</h2>
-            </div>
-            <div className="p-4 grid grid-cols-3 gap-3">
-              {TARGETS.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => handleSelectTarget(t)}
-                  className={`py-4 rounded-xl text-xl font-bold transition-all active:scale-95 ${
-                    target === t
-                      ? "bg-primary text-primary-foreground shadow-md"
-                      : "bg-muted text-foreground hover:bg-border"
-                  }`}
-                  style={{ direction: "ltr" }}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-            <div className="px-4 pb-6">
-              <p className="text-xs text-muted-foreground text-center">
-                بعد كل 33 تسبيحة وتحميدة و34 تكبيرة = 100
-              </p>
-            </div>
+        <div className="card w-full grid grid-cols-3 divide-x divide-x-reverse divide-border text-center py-3">
+          <div>
+            <p className="text-xl font-extrabold text-foreground">{ar(remaining)}</p>
+            <p className="text-xs text-muted-foreground">المتبقي</p>
+          </div>
+          <button type="button" onClick={() => setSheet("targets")} className="min-h-11" data-testid="dhikr-target">
+            <p className="text-xl font-extrabold text-primary dark:text-gold">{ar(target)}</p>
+            <p className="text-xs text-muted-foreground">الهدف</p>
+          </button>
+          <div>
+            <p className="text-xl font-extrabold text-foreground" data-testid="dhikr-sessions">{ar(sessions)}</p>
+            <p className="text-xs text-muted-foreground">الدورات</p>
           </div>
         </div>
-      )}
-    </div>
+      </div>
+
+      <Sheet open={sheet === "presets"} onClose={() => setSheet(null)} title="اختر الذكر">
+        <div className="list-group -mx-1">
+          {PRESETS.map((p) => {
+            const active = p.text === state.presetText;
+            return (
+              <button
+                key={p.text}
+                type="button"
+                className="list-row list-row--plain"
+                aria-pressed={active}
+                onClick={() => {
+                  chooseDhikr(p.text, p.target);
+                  setSheet(null);
+                }}
+              >
+                <span className="list-row__body">
+                  <span className="list-row__label block font-quran text-lg">{p.text}</span>
+                  <span className="list-row__hint block">
+                    {p.virtue}، الهدف {ar(p.target)}
+                  </span>
+                </span>
+                {active && <Icon name="checkCircle" size={22} className="text-primary dark:text-gold" />}
+              </button>
+            );
+          })}
+        </div>
+      </Sheet>
+
+      <Sheet open={sheet === "targets"} onClose={() => setSheet(null)} title="اختر الهدف">
+        <div className="grid grid-cols-3 gap-3 pb-2">
+          {TARGETS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              aria-pressed={t === target}
+              onClick={() => {
+                setDhikrTarget(t);
+                setSheet(null);
+              }}
+              className={`btn ${t === target ? "btn-primary" : "btn-soft"} text-lg`}
+            >
+              {ar(t)}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground text-center pt-3 pb-2">تغيير الهدف يبدأ العدّ من الصفر.</p>
+      </Sheet>
+
+      <ConfirmSheet
+        open={sheet === "reset"}
+        onClose={() => setSheet(null)}
+        onConfirm={resetDhikrCount}
+        title="تصفير العداد؟"
+        message={`سيبدأ العدّ من الصفر. تبقى الدورات المكتملة (${ar(sessions)}).`}
+        confirmLabel="تصفير"
+        danger
+      />
+    </Screen>
   );
 }
