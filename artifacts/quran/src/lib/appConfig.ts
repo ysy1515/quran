@@ -2,8 +2,8 @@ export const APP_CONFIG = {
   website: "https://quran.yahya.app",
   iosAppStoreUrl: "",
   androidPlayStoreUrl: "",
-  shareTitle: "القرآن الكريم",
-  shareText: "حمّل تطبيق القرآن الكريم - أذان وأذكار ومصحف",
+  shareTitle: "مصحفك",
+  shareText: "مصحفك معك: القرآن الكريم والأذكار ومواقيت الصلاة. حمّل تطبيق مصحفك",
 };
 
 export function isCapacitorNative(): boolean {

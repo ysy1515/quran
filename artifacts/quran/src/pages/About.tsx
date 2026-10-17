@@ -1,15 +1,14 @@
 import Screen from "@/components/shell/Screen";
+import { BRAND, BrandLockup } from "@/components/brand/Brand";
 
 export default function About() {
   return (
-    <Screen title="عن التطبيق" back="/more">
+    <Screen title="عن مصحفك" back="/more">
     <div className="screen__inner page-enter px-4 py-6">
       <div className="text-center mb-8">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-          <span className="font-quran text-2xl text-primary">ق</span>
-        </div>
-        <h1 className="font-quran text-2xl font-bold text-foreground">القرآن الكريم</h1>
-        <p className="text-sm text-muted-foreground mt-2">تطبيق للتلاوة والتفسير</p>
+        <h1 className="sr-only">{BRAND.name}</h1>
+        <BrandLockup size={72} tone="green" stacked className="text-muted-foreground" />
+        <p className="text-sm text-muted-foreground mt-3">القرآن الكريم والأذكار ومواقيت الصلاة</p>
       </div>
 
       <div className="space-y-4">
@@ -17,7 +16,7 @@ export default function About() {
         <div className="bg-card border border-border rounded-xl p-5">
           <h2 className="font-semibold text-foreground mb-3">عن التطبيق</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            هذا التطبيق مخصص لعرض القرآن الكريم وتفسير آياته. يستخدم التطبيق
+            مصحفك تطبيق لقراءة القرآن الكريم وتفسير آياته، مع ورد يومي وختمة، والأذكار، ومواقيت الصلاة. يستخدم التطبيق
             مصادر موثوقة لضمان دقة النصوص القرآنية والتفاسير. يمكنك قراءة السور،
             الاستماع إلى التفسير عند الضغط على أي آية، وحفظ الآيات في علامات مرجعية.
           </p>

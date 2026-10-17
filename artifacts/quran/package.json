@@ -96,6 +96,7 @@
     "@capacitor/status-bar": "8.0.2",
     "@fontsource/amiri-quran": "5.3.0",
     "@fontsource/cairo": "5.3.0",
+    "@fontsource/el-messiri": "5.3.0",
     "adhan": "^4.4.3"
   }
 }

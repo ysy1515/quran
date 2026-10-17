@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "com.yahya.quran",
-  appName: "القرآن الكريم",
+  appName: "مصحفك",
   webDir: "dist/mobile",
   bundledWebRuntime: false,
   plugins: {

@@ -482,6 +482,9 @@ importers:
       '@fontsource/cairo':
         specifier: 5.3.0
         version: 5.3.0
+      '@fontsource/el-messiri':
+        specifier: 5.3.0
+        version: 5.3.0
       adhan:
         specifier: ^4.4.3
         version: 4.4.3
@@ -945,6 +948,9 @@ packages:
 
   '@fontsource/cairo@5.3.0':
     resolution: {integrity: sha512-MdY6+gee1DVz4eUvx1Dd8Y1f50WcRELRKwKBarYZA3zT8dMhkuTWbcoE1LzezAy97h/9rob87s02NI6L8MaDgA==}
+
+  '@fontsource/el-messiri@5.3.0':
+    resolution: {integrity: sha512-Fqhf6DEuRInnLso60tk2i8mQlFfDjYNeF6Ybrto7jBnAwNClQqn4g9lMae/M+ub1zWYteM98uPOA1DwU5J8hbw==}
 
   '@gerrit0/mini-shiki@3.23.0':
     resolution: {integrity: sha512-bEMORlG0cqdjVyCEuU0cDQbORWX+kYCeo0kV1lbxF5bt4r7SID2l9bqsxJEM0zndaxpOUT7riCyIVEuqq/Ynxg==}
@@ -4475,6 +4481,8 @@ snapshots:
   '@fontsource/amiri-quran@5.3.0': {}
 
   '@fontsource/cairo@5.3.0': {}
+
+  '@fontsource/el-messiri@5.3.0': {}
 
   '@gerrit0/mini-shiki@3.23.0':
     dependencies:

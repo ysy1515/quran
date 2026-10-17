@@ -222,6 +222,12 @@
 /* Quranic text. In the components layer so utilities (text-center, leading-*)
    can override the defaults. */
 @layer components {
+  .brand-wordmark {
+    font-family: "El Messiri", "Cairo", sans-serif;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
   .font-quran {
     font-family: var(--app-font-quran);
     font-feature-settings: "liga" 1, "calt" 1;

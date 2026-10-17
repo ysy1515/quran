@@ -157,7 +157,7 @@ function StartKhatmah() {
       <div className="mx-auto mb-2 w-[132px] h-[132px] rounded-[32px] grid place-items-center bg-gradient-to-b from-[hsl(152_42%_22%)] to-[hsl(156_44%_12%)] shadow-[var(--elev-2)]">
         <FeatureArt name="khatmah" size={108} />
       </div>
-      <h2 className="text-xl font-extrabold text-foreground mt-3">ابدأ ختمتك</h2>
+      <h2 className="text-xl font-extrabold text-foreground mt-3">ابدأ ختمتك مع مصحفك</h2>
       <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
         قسّم المصحف إلى أوراد يومية، وتابع ورد اليوم، وسجّل ما أتممته حتى تختم القرآن الكريم.
       </p>

@@ -224,6 +224,26 @@ test.describe("tasbeeh", () => {
   });
 });
 
+test.describe("brand", () => {
+  test("shows the مصحفك name on About and More, and in the page title", async ({ page }) => {
+    await open(page, "/about");
+    await expect(page).toHaveTitle(/مصحفك/);
+    await expect(page.getByTestId("brand-lockup")).toContainText("مصحفك");
+    await expect(page.getByTestId("brand-lockup")).toContainText("مصحفك معك");
+    await page.goto("/more");
+    await expect(page.getByTestId("brand-lockup")).toContainText("مصحفك");
+    await expect(page.getByText("عن مصحفك")).toBeVisible();
+  });
+
+  test("the short surahs list opens An-Nas", async ({ page }) => {
+    await open(page, "/more");
+    await expect(page.getByTestId("short-surah-114")).toContainText("سورة الناس");
+    await expect(page.getByTestId("short-surah-105")).toContainText("سورة الفيل");
+    await page.getByTestId("short-surah-114").click();
+    await expect(page).toHaveURL(/\/mushaf\/114/);
+  });
+});
+
 test.describe("prayer", () => {
   test("shows six times, a countdown and the next prayer", async ({ page }) => {
     await page.clock.setFixedTime(new Date("2026-10-17T09:00:00+03:00"));

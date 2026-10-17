@@ -1,5 +1,6 @@
 import { toast } from "sonner";
 import Screen from "@/components/shell/Screen";
+import { BrandLockup } from "@/components/brand/Brand";
 import { ListSection, ListRow, Switch } from "@/components/kit/List";
 import { useKhatmah } from "@/lib/khatmah";
 import { useBookmarks, useFavorites } from "@/lib/bookmarks";
@@ -134,10 +135,14 @@ export default function More() {
         </ListSection>
 
         <ListSection title="التطبيق">
-          <ListRow icon="info" href="/about" label="عن التطبيق" />
+          <ListRow icon="info" href="/about" label="عن مصحفك" />
           <ListRow icon="share" onClick={() => void shareApp()} label="مشاركة التطبيق" hint="شارك رابط التطبيق مع أصدقائك" />
           <ListRow icon="rateStar" onClick={rateApp} label="تقييم التطبيق" hint="دعمك يساعدنا على التطوير" />
         </ListSection>
+
+        <div className="flex justify-center pt-8 pb-2 text-muted-foreground">
+          <BrandLockup size={40} tone="green" />
+        </div>
       </div>
     </Screen>
   );
