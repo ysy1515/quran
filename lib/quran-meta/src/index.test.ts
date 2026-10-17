@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   AYAH_COUNTS,
   JUZ_STARTS,
+  LAST_AYAH,
+  RUB_STARTS,
+  compareAyah,
+  previousAyah,
+  rubStart,
   PAGE_STARTS,
   SAJDAH_AYAT,
   TOTAL_AYAHS,
@@ -142,5 +147,26 @@ describe("page and juz helpers", () => {
     expect(juzOfAyah(2, 142)).toBe(2);
     expect(juzOfAyah(67, 1)).toBe(29);
     expect(juzOfAyah(114, 6)).toBe(30);
+  });
+});
+
+describe("hizb quarters", () => {
+  it("has 240 quarters that line up with juz boundaries", () => {
+    expect(RUB_STARTS).toHaveLength(240);
+    expect(rubStart(1)).toEqual({ surah: 1, ayah: 1 });
+    expect(rubStart(2)).toEqual({ surah: 2, ayah: 26 });
+    for (let juz = 1; juz <= 30; juz++) {
+      expect(rubStart((juz - 1) * 8 + 1)).toEqual(juzStart(juz));
+    }
+    for (let i = 1; i < 240; i++) {
+      expect(compareAyah(rubStart(i), rubStart(i + 1))).toBeLessThan(0);
+    }
+  });
+
+  it("steps back across surah boundaries", () => {
+    expect(previousAyah({ surah: 2, ayah: 26 })).toEqual({ surah: 2, ayah: 25 });
+    expect(previousAyah({ surah: 2, ayah: 1 })).toEqual({ surah: 1, ayah: 7 });
+    expect(previousAyah({ surah: 1, ayah: 1 })).toBeNull();
+    expect(LAST_AYAH).toEqual({ surah: 114, ayah: AYAH_COUNTS[113] });
   });
 });
