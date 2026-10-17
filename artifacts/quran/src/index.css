@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Cairo:wght@400;500;600;700;800&family=Scheherazade+New:wght@400;700&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -42,6 +41,8 @@
 
   --color-gold: hsl(var(--gold));
   --color-gold-light: hsl(var(--gold-light));
+  --color-gold-deep: hsl(var(--gold-deep));
+  --color-surface-2: hsl(var(--surface-2));
 
   --font-sans: var(--app-font-sans);
   --font-serif: var(--app-font-serif);
@@ -53,16 +54,18 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* LIGHT MODE — cream parchment, forest green, gold */
+/* Design tokens. Brand: deep Islamic green with gold, on warm cream (light) or
+   deep green-black (dark). Values are HSL triplets so Tailwind can add alpha. */
 :root {
-  --background: 40 33% 97%;          /* warm cream #FAF7F2 */
-  --foreground: 150 30% 12%;         /* deep forest #1A2E1A */
+  --background: 40 33% 97%;          /* cream #FAF7F2 */
+  --foreground: 150 30% 12%;         /* deep forest */
 
-  --card: 40 28% 95%;                /* soft parchment */
+  --card: 40 40% 99.5%;              /* warm white */
   --card-foreground: 150 30% 12%;
-  --card-border: 40 20% 85%;
+  --card-border: 40 20% 86%;
+  --surface-2: 40 22% 92.5%;         /* grouped-list background */
 
-  --popover: 40 28% 96%;
+  --popover: 40 40% 99%;
   --popover-foreground: 150 30% 12%;
   --popover-border: 40 20% 85%;
 
@@ -75,81 +78,123 @@
   --secondary-border: hsl(40 20% 80%);
 
   --muted: 40 20% 92%;
-  --muted-foreground: 150 18% 33%;
+  --muted-foreground: 150 12% 34%;
   --muted-border: hsl(40 15% 85%);
 
   --accent: 43 65% 52%;              /* gold #C9A84C */
   --accent-foreground: 150 30% 10%;
   --accent-border: hsl(43 55% 44%);
 
-  --destructive: 0 72% 51%;
+  --destructive: 0 68% 46%;
   --destructive-foreground: 0 0% 98%;
-  --destructive-border: hsl(0 72% 44%);
+  --destructive-border: hsl(0 72% 40%);
 
-  --border: 40 18% 82%;
+  --border: 40 18% 84%;
   --input: 40 18% 82%;
   --ring: 150 42% 22%;
 
   --gold: 43 65% 52%;
   --gold-light: 43 75% 82%;
+  --gold-deep: 40 58% 36%;           /* gold text on light surfaces (AA) */
 
-  --app-font-sans: 'Cairo', sans-serif;
-  --app-font-serif: 'Amiri', serif;
-  --app-font-quran: 'Scheherazade New', 'Amiri', serif;
-  --radius: 0.75rem;
+  /* Chrome */
+  --header-from: 150 42% 25%;
+  --header-to: 152 46% 17%;
+  --header-foreground: 40 40% 98%;
+  --header-muted: 43 70% 78%;
+  --tabbar: 156 34% 7%;              /* green-black #0C1A13 */
+  --tabbar-border: 43 40% 40%;
+  --tabbar-foreground: 40 12% 68%;
+  --tabbar-active: 43 72% 62%;
+
+  /* Elevation (warm green-black shadows, never pure black) */
+  --shadow-color: 152 40% 10%;
+  --elev-1: 0 1px 2px hsl(var(--shadow-color) / 0.06), 0 2px 8px hsl(var(--shadow-color) / 0.05);
+  --elev-2: 0 2px 4px hsl(var(--shadow-color) / 0.06), 0 8px 24px hsl(var(--shadow-color) / 0.10);
+  --elev-3: 0 4px 8px hsl(var(--shadow-color) / 0.08), 0 16px 40px hsl(var(--shadow-color) / 0.16);
+
+  --app-font-sans: 'Cairo', system-ui, sans-serif;
+  --app-font-serif: 'Amiri Quran', 'Cairo', serif;
+  --app-font-quran: 'Amiri Quran', 'Scheherazade New', serif;
+  --radius: 0.875rem;
+
+  --header-h: 52px;
+  --tabbar-h: 58px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 
   --opaque-button-border-intensity: -8;
   --elevate-1: rgba(0,0,0,.03);
   --elevate-2: rgba(0,0,0,.08);
   --button-outline: rgba(0,0,0,.10);
   --badge-outline: rgba(0,0,0,.05);
+  color-scheme: light;
 }
 
-/* DARK MODE — deep indigo, gold accents */
+/* DARK MODE — deep green premium theme, gold accents */
 .dark {
-  --background: 230 25% 10%;         /* deep navy #111827 */
-  --foreground: 40 30% 92%;          /* warm cream */
+  --background: 156 32% 6%;          /* #0B1712 */
+  --foreground: 40 30% 92%;
 
-  --card: 230 22% 14%;
+  --card: 154 26% 10%;
   --card-foreground: 40 30% 92%;
-  --card-border: 230 20% 22%;
+  --card-border: 154 20% 17%;
+  --surface-2: 156 30% 4.5%;
 
-  --popover: 230 22% 13%;
+  --popover: 154 26% 11%;
   --popover-foreground: 40 30% 92%;
-  --popover-border: 230 20% 22%;
+  --popover-border: 154 20% 18%;
 
-  --primary: 43 65% 52%;             /* gold becomes primary in dark */
-  --primary-foreground: 230 25% 10%;
-  --primary-border: hsl(43 55% 44%);
+  --primary: 150 40% 34%;
+  --primary-foreground: 40 40% 97%;
+  --primary-border: hsl(150 40% 26%);
 
-  --secondary: 230 20% 18%;
-  --secondary-foreground: 40 25% 80%;
-  --secondary-border: hsl(230 20% 25%);
+  --secondary: 154 22% 15%;
+  --secondary-foreground: 40 25% 82%;
+  --secondary-border: hsl(154 20% 22%);
 
-  --muted: 230 20% 17%;
-  --muted-foreground: 40 15% 60%;
-  --muted-border: hsl(230 18% 24%);
+  --muted: 154 20% 14%;
+  --muted-foreground: 40 12% 66%;
+  --muted-border: hsl(154 18% 20%);
 
-  --accent: 150 42% 38%;             /* muted green accent in dark */
-  --accent-foreground: 40 30% 92%;
-  --accent-border: hsl(150 42% 30%);
+  --accent: 43 65% 56%;
+  --accent-foreground: 156 32% 8%;
+  --accent-border: hsl(43 55% 44%);
 
-  --destructive: 0 72% 51%;
+  --destructive: 0 65% 55%;
   --destructive-foreground: 0 0% 98%;
-  --destructive-border: hsl(0 72% 44%);
+  --destructive-border: hsl(0 65% 45%);
 
-  --border: 230 20% 22%;
-  --input: 230 20% 22%;
-  --ring: 43 65% 52%;
+  --border: 154 18% 18%;
+  --input: 154 18% 20%;
+  --ring: 43 65% 56%;
 
-  --gold: 43 65% 60%;
-  --gold-light: 43 55% 30%;
+  --gold: 43 68% 60%;
+  --gold-light: 43 45% 26%;
+  --gold-deep: 43 70% 66%;
+
+  --header-from: 153 38% 13%;
+  --header-to: 156 36% 9%;
+  --header-foreground: 40 35% 95%;
+  --header-muted: 43 60% 70%;
+  --tabbar: 156 36% 4%;
+  --tabbar-border: 43 35% 28%;
+  --tabbar-foreground: 40 10% 58%;
+  --tabbar-active: 43 75% 64%;
+
+  --shadow-color: 156 50% 2%;
+  --elev-1: 0 1px 2px hsl(var(--shadow-color) / 0.4), 0 2px 8px hsl(var(--shadow-color) / 0.3);
+  --elev-2: 0 2px 4px hsl(var(--shadow-color) / 0.4), 0 8px 24px hsl(var(--shadow-color) / 0.45);
+  --elev-3: 0 4px 8px hsl(var(--shadow-color) / 0.5), 0 16px 40px hsl(var(--shadow-color) / 0.55);
 
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255,255,255,.04);
   --elevate-2: rgba(255,255,255,.09);
   --button-outline: rgba(255,255,255,.10);
   --badge-outline: rgba(255,255,255,.05);
+  color-scheme: dark;
 }
 
 @layer base {
@@ -160,11 +205,17 @@
   html {
     direction: rtl;
     font-family: var(--app-font-sans);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  html, body, #root {
+    height: 100%;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--app-font-sans);
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
@@ -287,4 +338,603 @@
 @keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* ───────────────────────── App shell ─────────────────────────
+   Three regions: fixed header, one scrolling body, fixed tab bar.
+   No position:fixed; the bars are flex siblings of the scroller, so content
+   can never slide underneath them and no magic bottom padding is needed. */
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: hsl(var(--background));
+}
+.app-shell__screen {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.screen {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.screen__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+  scroll-padding-top: 12px;
+}
+.screen__inner {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* Header */
+.app-header {
+  flex: none;
+  position: relative;
+  z-index: 20;
+  color: hsl(var(--header-foreground));
+  background: linear-gradient(180deg, hsl(var(--header-from)), hsl(var(--header-to)));
+  padding-top: var(--safe-top);
+  padding-left: max(var(--safe-left), 8px);
+  padding-right: max(var(--safe-right), 8px);
+  box-shadow: 0 1px 0 hsl(var(--gold) / 0.28), 0 6px 18px hsl(var(--shadow-color) / 0.14);
+  transition: margin-top 0.28s ease, opacity 0.2s ease;
+}
+.app-header::after {
+  /* faint top-left key light for depth */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 140% at 85% -40%, hsl(0 0% 100% / 0.10), transparent 55%);
+}
+.app-header--hidden {
+  margin-top: calc(-1 * (var(--header-h) + var(--safe-top) + 80px));
+  opacity: 0;
+  pointer-events: none;
+}
+.app-header__row {
+  position: relative;
+  z-index: 1;
+  height: var(--header-h);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+.app-header__side {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-self: start;
+}
+.app-header__side--end {
+  justify-self: end;
+}
+.app-header__title {
+  text-align: center;
+  min-width: 0;
+  line-height: 1.2;
+}
+.app-header__title h1 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-header__title p {
+  font-size: 0.8125rem;
+  margin: 1px 0 0;
+  color: hsl(var(--header-muted));
+  font-weight: 600;
+}
+.header-btn {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: inherit;
+  transition: background-color 0.15s ease, transform 0.12s ease;
+}
+.header-btn:active {
+  background: hsl(0 0% 100% / 0.14);
+  transform: scale(0.94);
+}
+.header-btn:focus-visible {
+  outline: 2px solid hsl(var(--tabbar-active));
+  outline-offset: -2px;
+}
+.header-btn[aria-pressed="true"] {
+  color: hsl(var(--tabbar-active));
+}
+
+/* Tab bar */
+.tabbar {
+  flex: none;
+  position: relative;
+  z-index: 20;
+  background: hsl(var(--tabbar));
+  border-top: 1px solid hsl(var(--tabbar-border) / 0.45);
+  padding-bottom: max(var(--safe-bottom), 4px);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+  transition: margin-bottom 0.28s ease, opacity 0.2s ease;
+}
+.tabbar--hidden {
+  margin-bottom: calc(-1 * (var(--tabbar-h) + var(--safe-bottom) + 8px));
+  opacity: 0;
+  pointer-events: none;
+}
+.tabbar__list {
+  height: var(--tabbar-h);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  max-width: 720px;
+  margin: 0 auto;
+  list-style: none;
+  padding: 0;
+}
+.tabbar__item {
+  display: flex;
+}
+.tabbar__link {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: hsl(var(--tabbar-foreground));
+  font-size: 0.75rem;
+  font-weight: 600;
+  position: relative;
+  min-height: 44px;
+  transition: color 0.18s ease;
+}
+.tabbar__icon {
+  display: inline-flex;
+  transition: transform 0.18s ease;
+}
+.tabbar__link.is-active {
+  color: hsl(var(--tabbar-active));
+}
+.tabbar__link.is-active .tabbar__icon {
+  transform: translateY(-1px);
+  filter: drop-shadow(0 0 6px hsl(var(--tabbar-active) / 0.35));
+}
+.tabbar__link.is-active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 28px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: hsl(var(--tabbar-active));
+}
+.tabbar__link:active .tabbar__icon {
+  transform: scale(0.9);
+}
+.tabbar__link:focus-visible {
+  outline: 2px solid hsl(var(--tabbar-active));
+  outline-offset: -4px;
+  border-radius: 10px;
+}
+
+/* Segmented control (header extra) */
+.segmented {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  margin: 0 8px 10px;
+  padding: 3px;
+  border-radius: 12px;
+  background: hsl(0 0% 100% / 0.12);
+}
+.segmented button {
+  min-height: 36px;
+  border-radius: 9px;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: hsl(var(--header-foreground) / 0.85);
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.segmented button[aria-selected="true"] {
+  background: hsl(var(--card));
+  color: hsl(var(--primary));
+  box-shadow: var(--elev-1);
+}
+.dark .segmented button[aria-selected="true"] {
+  color: hsl(var(--gold));
+}
+
+/* ───────────────────────── Surfaces ───────────────────────── */
+.card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--card-border));
+  border-radius: 20px;
+  box-shadow: var(--elev-1);
+}
+.card--raised {
+  box-shadow: var(--elev-2);
+}
+.press {
+  transition: transform 0.12s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+.press:active {
+  transform: scale(0.975);
+}
+@media (prefers-reduced-motion: reduce) {
+  .press:active,
+  .tabbar__link:active .tabbar__icon,
+  .header-btn:active {
+    transform: none;
+  }
+  .page-enter {
+    animation: none;
+  }
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 18px;
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 1.0625rem;
+  transition: transform 0.12s ease, filter 0.18s ease, background-color 0.18s ease;
+}
+.btn:active {
+  transform: scale(0.975);
+}
+.btn:disabled {
+  opacity: 0.5;
+}
+.btn-primary {
+  color: hsl(var(--primary-foreground));
+  background: linear-gradient(180deg, hsl(150 40% 28%), hsl(var(--primary)));
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.16), 0 6px 16px hsl(var(--primary) / 0.28);
+}
+.dark .btn-primary {
+  background: linear-gradient(180deg, hsl(150 38% 38%), hsl(var(--primary)));
+}
+.btn-gold {
+  color: hsl(156 40% 8%);
+  background: linear-gradient(180deg, hsl(44 78% 66%), hsl(41 66% 50%));
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.35), 0 6px 16px hsl(40 60% 40% / 0.28);
+}
+.btn-soft {
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.09);
+}
+.dark .btn-soft {
+  color: hsl(var(--gold));
+  background: hsl(var(--gold) / 0.12);
+}
+.btn-danger {
+  color: hsl(var(--destructive-foreground));
+  background: hsl(var(--destructive));
+}
+.btn:focus-visible,
+.press:focus-visible,
+.list-row:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Grouped list (iOS settings style, used by More, Index and Prayer) */
+.list-section {
+  margin-top: 22px;
+}
+.list-section__title {
+  padding: 0 20px 8px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: hsl(var(--muted-foreground));
+}
+.list-group {
+  background: hsl(var(--card));
+  border-top: 1px solid hsl(var(--card-border));
+  border-bottom: 1px solid hsl(var(--card-border));
+}
+@media (min-width: 640px) {
+  .list-group {
+    border: 1px solid hsl(var(--card-border));
+    border-radius: 16px;
+    margin: 0 16px;
+    overflow: hidden;
+  }
+}
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 16px;
+  text-align: right;
+  position: relative;
+  color: hsl(var(--foreground));
+  transition: background-color 0.15s ease;
+}
+.list-row + .list-row::before,
+.list-row + * > .list-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 58px;
+  left: 0;
+  height: 1px;
+  background: hsl(var(--border) / 0.8);
+}
+.list-row--plain + .list-row--plain::before {
+  right: 16px;
+}
+button.list-row:active,
+a.list-row:active {
+  background: hsl(var(--muted));
+}
+.list-row__icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: hsl(var(--primary-foreground));
+  background: linear-gradient(160deg, hsl(150 38% 32%), hsl(var(--primary)));
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.18), 0 1px 2px hsl(var(--shadow-color) / 0.2);
+}
+.list-row__icon--gold {
+  color: hsl(156 40% 10%);
+  background: linear-gradient(160deg, hsl(44 78% 66%), hsl(41 62% 48%));
+}
+.list-row__body {
+  flex: 1;
+  min-width: 0;
+}
+.list-row__label {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.list-row__hint {
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+  line-height: 1.4;
+}
+.list-row__value {
+  flex: none;
+  font-size: 0.9375rem;
+  color: hsl(var(--muted-foreground));
+  font-weight: 600;
+}
+.list-row__chevron {
+  flex: none;
+  color: hsl(var(--muted-foreground) / 0.7);
+}
+.list-row[aria-disabled="true"] {
+  opacity: 0.5;
+}
+.badge-count {
+  min-width: 44px;
+  padding: 2px 10px;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 800;
+  color: hsl(var(--primary-foreground));
+  background: hsl(var(--primary));
+}
+.dark .badge-count {
+  color: hsl(156 40% 8%);
+  background: hsl(var(--gold));
+}
+
+/* Time input styled as a value */
+.time-value {
+  font: inherit;
+  font-weight: 700;
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.08);
+  border-radius: 10px;
+  padding: 6px 10px;
+  min-height: 36px;
+  direction: ltr;
+}
+.dark .time-value {
+  color: hsl(var(--gold));
+  background: hsl(var(--gold) / 0.1);
+}
+.time-value:disabled {
+  opacity: 0.45;
+}
+
+/* Bottom sheet */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: hsl(156 40% 4% / 0.45);
+  animation: fadeIn 0.2s ease;
+}
+.sheet {
+  position: fixed;
+  z-index: 61;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 88dvh;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+  max-width: 560px;
+  background: hsl(var(--card));
+  border-radius: 24px 24px 0 0;
+  box-shadow: var(--elev-3);
+  padding-bottom: max(var(--safe-bottom), 12px);
+  animation: sheetUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.sheet__grip {
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: hsl(var(--muted-foreground) / 0.3);
+  margin: 8px auto 4px;
+  flex: none;
+}
+.sheet__body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 20px 8px;
+}
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet { animation: none; }
+}
+
+/* Ayah end marker: an ornamental ring drawn in CSS around the ayah number.
+   No lettering or script is drawn; the number is the ayah's real number. */
+.ayah-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.55em;
+  height: 1.55em;
+  padding: 0 0.15em;
+  margin: 0 0.18em;
+  border-radius: 999px;
+  vertical-align: middle;
+  font-family: var(--app-font-sans);
+  font-size: 0.56em;
+  font-weight: 700;
+  line-height: 1;
+  color: hsl(var(--gold-deep));
+  border: 1.5px solid hsl(var(--gold) / 0.9);
+  box-shadow: 0 0 0 2px hsl(var(--card)), 0 0 0 3.2px hsl(var(--gold) / 0.45);
+  background: hsl(var(--gold) / 0.07);
+  user-select: none;
+}
+
+/* ───────────────────────── Feature tiles ─────────────────────────
+   Large premium cards (Athkar grid). A deep-green "material" with a soft key
+   light from the top-left, an inner highlight edge and a warm drop shadow. */
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 168px;
+  padding: 14px 16px;
+  border-radius: 24px;
+  overflow: hidden;
+  isolation: isolate;
+  color: hsl(40 45% 97%);
+  background: linear-gradient(160deg, var(--tile-a), var(--tile-b));
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.16),
+    inset 0 -1px 0 hsl(0 0% 0% / 0.25),
+    var(--elev-2);
+  transition: transform 0.14s ease, box-shadow 0.2s ease;
+  text-align: right;
+}
+.tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(120% 90% at 15% 0%, hsl(0 0% 100% / 0.16), transparent 55%),
+    radial-gradient(80% 60% at 100% 100%, hsl(43 70% 55% / 0.14), transparent 60%);
+}
+.tile::after {
+  /* thin gold rim */
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid hsl(43 65% 60% / 0.28);
+  pointer-events: none;
+}
+.tile:active {
+  transform: scale(0.97);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.12), var(--elev-1);
+}
+.tile:focus-visible {
+  outline: 3px solid hsl(var(--gold));
+  outline-offset: 2px;
+}
+.tile--wide {
+  grid-column: 1 / -1;
+  min-height: 176px;
+}
+.tile__art {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  filter: drop-shadow(0 10px 14px hsl(156 50% 3% / 0.35));
+  transition: transform 0.25s ease;
+}
+.tile--wide .tile__art {
+  top: 50%;
+  left: 18px;
+  transform: translateY(-50%);
+}
+.tile:active .tile__art {
+  transform: translateY(1px) scale(0.98);
+}
+.tile--wide:active .tile__art {
+  transform: translateY(calc(-50% + 1px)) scale(0.98);
+}
+.tile__title {
+  font-size: 1.1875rem;
+  font-weight: 800;
+  line-height: 1.35;
+  text-shadow: 0 1px 2px hsl(156 50% 4% / 0.45);
+  max-width: 70%;
+}
+.tile--wide .tile__title {
+  font-size: 1.375rem;
+  max-width: 55%;
+}
+.tile__hint {
+  margin-top: 2px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: hsl(43 70% 80%);
+  max-width: 70%;
+}
+.tile--t1 { --tile-a: hsl(151 44% 27%); --tile-b: hsl(154 50% 13%); }
+.tile--t2 { --tile-a: hsl(160 36% 20%); --tile-b: hsl(165 44% 8%); }
+.tile--t3 { --tile-a: hsl(146 34% 31%); --tile-b: hsl(150 42% 16%); }
+.tile--t4 { --tile-a: hsl(168 32% 24%); --tile-b: hsl(172 42% 11%); }
+.tile--t5 { --tile-a: hsl(40 48% 36%); --tile-b: hsl(36 52% 18%); }
+.dark .tile { box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.10), inset 0 -1px 0 hsl(0 0% 0% / 0.35), var(--elev-2); }
+.feature-art {
+  display: inline-block;
+  line-height: 0;
 }
