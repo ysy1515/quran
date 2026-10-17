@@ -1,0 +1,488 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>html,body{margin:0;background:transparent}canvas{display:block}</style>
+<script type="importmap">
+{ "imports": { "three": "./node_modules/three/build/three.module.js", "three/addons/": "./node_modules/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<script type="module">
+import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
+
+const SIZE = 1024;
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(SIZE, SIZE);
+renderer.setClearColor(0x000000, 0);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envTex = pmrem.fromScene(new RoomEnvironment(), 0.03).texture;
+
+// ── Brushed-metal normal/roughness texture (fine horizontal streaks) ─────────
+function brushedTexture() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 512;
+  const g = c.getContext("2d");
+  g.fillStyle = "#808080";
+  g.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 2600; i++) {
+    const y = Math.random() * 512;
+    const v = 110 + Math.random() * 40;
+    g.strokeStyle = `rgba(${v},${v},${v},${0.15 + Math.random() * 0.25})`;
+    g.lineWidth = Math.random() * 1.4;
+    g.beginPath();
+    const x = Math.random() * 512;
+    g.moveTo(x, y);
+    g.lineTo(x + 60 + Math.random() * 300, y + (Math.random() - 0.5) * 2);
+    g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(2, 2);
+  return t;
+}
+const brushed = brushedTexture();
+
+// ── One material family for every icon ──────────────────────────────────────
+const M = {
+  gold: new THREE.MeshPhysicalMaterial({
+    color: 0xe0b45a, metalness: 1, roughness: 0.3, roughnessMap: brushed,
+    anisotropy: 0.7, envMapIntensity: 1.25, clearcoat: 0.25, clearcoatRoughness: 0.2,
+  }),
+  goldDeep: new THREE.MeshPhysicalMaterial({
+    color: 0xb98a34, metalness: 1, roughness: 0.38, roughnessMap: brushed, anisotropy: 0.6, envMapIntensity: 1.1,
+  }),
+  green: new THREE.MeshPhysicalMaterial({
+    color: 0x0e5a3c, metalness: 0.15, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.12, envMapIntensity: 0.9,
+  }),
+  greenDeep: new THREE.MeshPhysicalMaterial({
+    color: 0x093a28, metalness: 0.1, roughness: 0.35, clearcoat: 0.8, clearcoatRoughness: 0.2, envMapIntensity: 0.8,
+  }),
+  ivory: new THREE.MeshPhysicalMaterial({
+    color: 0xf4ead2, metalness: 0, roughness: 0.55, sheen: 0.4, sheenColor: 0xffffff, envMapIntensity: 0.8,
+  }),
+  glow: new THREE.MeshPhysicalMaterial({
+    color: 0xffd58a, emissive: 0xffa53a, emissiveIntensity: 1.1, roughness: 0.35, metalness: 0, envMapIntensity: 0.4,
+  }),
+};
+for (const m of Object.values(M)) m.envMap = envTex;
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+const bevel = (depth, size = 0.05, seg = 6) => ({
+  depth, bevelEnabled: true, bevelThickness: size, bevelSize: size, bevelSegments: seg, curveSegments: 64,
+});
+function extrude(shape, depth, mat, b = 0.06) {
+  const geo = new THREE.ExtrudeGeometry(shape, bevel(depth, b));
+  geo.center();
+  return new THREE.Mesh(geo, mat);
+}
+function lathe(points, mat, seg = 96) {
+  return new THREE.Mesh(new THREE.LatheGeometry(points.map(([x, y]) => new THREE.Vector2(x, y)), seg), mat);
+}
+function group(...children) {
+  const g = new THREE.Group();
+  children.forEach((c) => g.add(c));
+  return g;
+}
+function crescentShape(r = 1, cut = 0.82, offset = 0.42) {
+  const s = new THREE.Shape();
+  s.absarc(0, 0, r, 0, Math.PI * 2, false);
+  const h = new THREE.Path();
+  h.absarc(offset, offset * 0.45, r * cut, 0, Math.PI * 2, true);
+  s.holes.push(h);
+  // Holes that cross the outline aren't supported, so build the crescent from points.
+  const pts = [];
+  const N = 200;
+  const inside = (x, y) => (x - offset) ** 2 + (y - offset * 0.45) ** 2 < (r * cut) ** 2;
+  // Outer arc (points outside the cut circle), then inner arc back.
+  const outer = [];
+  for (let i = 0; i <= N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    const x = r * Math.cos(a), y = r * Math.sin(a);
+    if (!inside(x, y)) outer.push([a, x, y]);
+  }
+  // find the contiguous range (wrap around)
+  outer.sort((p, q) => p[0] - q[0]);
+  let gapIdx = 0, gap = 0;
+  for (let i = 0; i < outer.length; i++) {
+    const nxt = outer[(i + 1) % outer.length];
+    const d = ((nxt[0] - outer[i][0]) + Math.PI * 2) % (Math.PI * 2);
+    if (d > gap) { gap = d; gapIdx = i; }
+  }
+  const ordered = [...outer.slice(gapIdx + 1), ...outer.slice(0, gapIdx + 1)];
+  ordered.forEach(([, x, y]) => pts.push(new THREE.Vector2(x, y)));
+  const a0 = Math.atan2(ordered.at(-1)[2] - offset * 0.45, ordered.at(-1)[1] - offset);
+  const a1 = Math.atan2(ordered[0][2] - offset * 0.45, ordered[0][1] - offset);
+  let start = a0, end = a1;
+  while (end > start) end -= Math.PI * 2;
+  for (let i = 1; i < N; i++) {
+    const a = start + ((end - start) * i) / N;
+    pts.push(new THREE.Vector2(offset + r * cut * Math.cos(a), offset * 0.45 + r * cut * Math.sin(a)));
+  }
+  return new THREE.Shape(pts);
+}
+function starShape(points = 8, outer = 1, inner = 0.72) {
+  const s = new THREE.Shape();
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 ? inner : outer;
+    const a = (i / (points * 2)) * Math.PI * 2 + Math.PI / 2;
+    const x = r * Math.cos(a), y = r * Math.sin(a);
+    i ? s.lineTo(x, y) : s.moveTo(x, y);
+  }
+  s.closePath();
+  return s;
+}
+function rubElHizb(r = 1) {
+  // Two overlapping squares (the eight-pointed Islamic star).
+  const s = new THREE.Shape();
+  const pts = [];
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2 + Math.PI / 8;
+    const rr = i % 2 ? r * 0.765 : r;
+    pts.push([rr * Math.cos(a), rr * Math.sin(a)]);
+  }
+  pts.forEach(([x, y], i) => (i ? s.lineTo(x, y) : s.moveTo(x, y)));
+  s.closePath();
+  return s;
+}
+function cloud(mat, scale = 1) {
+  const g = new THREE.Group();
+  const blobs = [[-0.75, 0, 0.5], [-0.2, 0.25, 0.68], [0.45, 0.12, 0.58], [0.95, -0.05, 0.42], [0.1, -0.15, 0.55]];
+  for (const [x, y, r] of blobs) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 64, 48), mat);
+    m.position.set(x, y, 0);
+    m.scale.z = 0.7;
+    g.add(m);
+  }
+  g.scale.setScalar(scale);
+  return g;
+}
+
+// ── Models (no lettering of any kind) ───────────────────────────────────────
+const MODELS = {
+  morning() {
+    const sun = new THREE.Mesh(new THREE.SphereGeometry(0.78, 96, 64), M.gold);
+    sun.position.set(0, 0.25, -0.2);
+    const rays = new THREE.Group();
+    for (let i = 0; i < 9; i++) {
+      const a = Math.PI * (0.05 + (0.9 * i) / 8);
+      const ray = new THREE.Mesh(new RoundedBoxGeometry(0.16, 0.42, 0.12, 4, 0.05), M.goldDeep);
+      ray.position.set(Math.cos(a) * 1.2, 0.25 + Math.sin(a) * 1.2, -0.25);
+      ray.rotation.z = a - Math.PI / 2;
+      rays.add(ray);
+    }
+    const hill = cloud(M.ivory, 0.95);
+    hill.position.set(0.15, -0.45, 0.35);
+    return group(sun, rays, hill);
+  },
+  evening() {
+    const moon = extrude(crescentShape(1, 0.86, 0.5), 0.32, M.gold, 0.08);
+    moon.rotation.z = -0.35;
+    const star = extrude(starShape(5, 0.32, 0.14), 0.1, M.goldDeep, 0.04);
+    star.position.set(0.75, 0.6, 0.1);
+    const star2 = extrude(starShape(5, 0.2, 0.09), 0.08, M.gold, 0.03);
+    star2.position.set(1.0, 0.12, 0.05);
+    // Low green dunes: the horizon at sunset.
+    const dune = (x, w, h) => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 48), M.green);
+      m.scale.set(w, h, 0.5);
+      m.position.set(x, -0.85, 0.35);
+      return m;
+    };
+    const star3 = extrude(starShape(5, 0.14, 0.06), 0.06, M.goldDeep, 0.025);
+    star3.position.set(-0.95, 0.85, -0.05);
+    void dune;
+    return group(moon, star, star2, star3);
+  },
+  sleep() {
+    const moon = extrude(crescentShape(0.85, 0.86, 0.45), 0.28, M.gold, 0.07);
+    moon.rotation.z = 0.5;
+    moon.position.set(-0.15, 0.35, -0.1);
+    const c = cloud(M.ivory, 0.95);
+    c.position.set(0.1, -0.45, 0.35);
+    const s1 = extrude(starShape(4, 0.2, 0.07), 0.07, M.goldDeep, 0.03);
+    s1.position.set(0.95, 0.7, 0);
+    const s2 = s1.clone();
+    s2.scale.setScalar(0.65);
+    s2.position.set(0.62, 1.08, -0.1);
+    return group(moon, c, s1, s2);
+  },
+  "post-prayer"() {
+    // Mosque: dome on a drum, two minarets, crescent finial.
+    const base = new THREE.Mesh(new RoundedBoxGeometry(1.9, 0.75, 1.0, 6, 0.08), M.green);
+    base.position.y = -0.6;
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.22, 96), M.goldDeep);
+    drum.position.y = -0.12;
+    const dome = lathe(
+      Array.from({ length: 40 }, (_, i) => {
+        const t = i / 39;
+        const a = t * Math.PI * 0.5;
+        const r = 0.62 * Math.cos(a) * (1 + 0.12 * Math.sin(a * 2));
+        return [Math.max(r, 0.001), Math.sin(a) * 0.82 + (t > 0.85 ? (t - 0.85) * 0.9 : 0)];
+      }),
+      M.gold,
+    );
+    dome.position.y = -0.01;
+    const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.04, 0.28, 24), M.goldDeep);
+    spire.position.y = 0.98;
+    const fin = extrude(crescentShape(0.14, 0.82, 0.07), 0.04, M.gold, 0.015);
+    fin.position.y = 1.22;
+    fin.rotation.z = Math.PI / 2;
+    const minaret = (x) => {
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 1.6, 48), M.ivory);
+      shaft.position.set(x, -0.2, 0.05);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.035, 16, 48), M.goldDeep);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(x, 0.35, 0.05);
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.35, 48), M.gold);
+      cap.position.set(x, 0.78, 0.05);
+      return group(shaft, ring, cap);
+    };
+    const door = new THREE.Mesh(new RoundedBoxGeometry(0.34, 0.48, 0.06, 4, 0.1), M.goldDeep);
+    door.position.set(0, -0.72, 0.5);
+    return group(base, drum, dome, spire, fin, minaret(-1.1), minaret(1.1), door);
+  },
+  istighfar() {
+    // A drop of water above an open lotus-like dish: purification and renewal.
+    const drop = lathe(
+      Array.from({ length: 48 }, (_, i) => {
+        const t = i / 47; // 0 bottom .. 1 tip
+        const a = t * Math.PI;
+        const r = 0.6 * Math.sin(a) * Math.pow(1 - t, 0.55) * 1.35;
+        return [Math.max(r, 0.0005), -0.55 + t * 1.6];
+      }),
+      M.gold,
+    );
+    drop.position.y = 0.25;
+    const dish = lathe(
+      [[0.001, -0.9], [0.5, -0.9], [0.85, -0.8], [1.1, -0.55], [1.15, -0.5], [1.05, -0.55], [0.75, -0.72], [0.001, -0.78]],
+      M.green,
+    );
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(1.12, 0.045, 24, 128), M.goldDeep);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = -0.52;
+    return group(dish, rim, drop);
+  },
+  praise() {
+    const star = extrude(rubElHizb(1.05), 0.22, M.gold, 0.06);
+    const inner = extrude(rubElHizb(0.68), 0.12, M.green, 0.04);
+    inner.position.z = 0.2;
+    inner.rotation.z = Math.PI / 8;
+    const boss = new THREE.Mesh(new THREE.SphereGeometry(0.2, 64, 48), M.gold);
+    boss.position.z = 0.36;
+    boss.scale.z = 0.75;
+    return group(star, inner, boss);
+  },
+  "salah-nabi"() {
+    // Hanging lantern (fanous) with a warm light inside.
+    const body = lathe(
+      [[0.001, -0.95], [0.32, -0.95], [0.42, -0.85], [0.55, -0.2], [0.5, 0.25], [0.3, 0.45], [0.001, 0.45]],
+      M.glow,
+    );
+    const cage = new THREE.Group();
+    for (let i = 0; i < 8; i++) {
+      const rib = lathe([[0.001, -0.95], [0.34, -0.95], [0.44, -0.85], [0.57, -0.2], [0.52, 0.25], [0.32, 0.45], [0.001, 0.45]], M.gold, 96);
+      rib.scale.set(1.02, 1, 1.02);
+      rib.geometry = new THREE.LatheGeometry(
+        [[0.42, -0.85], [0.57, -0.2], [0.52, 0.25], [0.32, 0.45]].map(([x, y]) => new THREE.Vector2(x, y)),
+        2, (i / 8) * Math.PI * 2, 0.16,
+      );
+      cage.add(rib);
+    }
+    const bottom = lathe([[0.001, -1.15], [0.18, -1.12], [0.36, -0.98], [0.42, -0.9], [0.001, -0.9]], M.gold);
+    const roof = lathe([[0.001, 0.95], [0.08, 0.9], [0.2, 0.7], [0.4, 0.5], [0.36, 0.42], [0.001, 0.42]], M.gold);
+    const finial = new THREE.Mesh(new THREE.SphereGeometry(0.08, 32, 24), M.goldDeep);
+    finial.position.y = 1.0;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.035, 20, 48), M.goldDeep);
+    ring.position.y = 1.2;
+    const light = new THREE.PointLight(0xffc870, 3, 3);
+    light.position.y = -0.25;
+    const g = group(body, cage, bottom, roof, finial, ring, light);
+    g.scale.setScalar(0.95);
+    return g;
+  },
+  istiazah() {
+    // Shield: gold rim, green enamel field, gold boss.
+    const outline = (s) => {
+      const sh = new THREE.Shape();
+      sh.moveTo(0, 1.05 * s);
+      sh.bezierCurveTo(0.45 * s, 0.95 * s, 0.8 * s, 0.95 * s, 0.95 * s, 0.85 * s);
+      sh.bezierCurveTo(0.98 * s, 0.1 * s, 0.75 * s, -0.6 * s, 0, -1.1 * s);
+      sh.bezierCurveTo(-0.75 * s, -0.6 * s, -0.98 * s, 0.1 * s, -0.95 * s, 0.85 * s);
+      sh.bezierCurveTo(-0.8 * s, 0.95 * s, -0.45 * s, 0.95 * s, 0, 1.05 * s);
+      return sh;
+    };
+    const rim = extrude(outline(1), 0.22, M.gold, 0.07);
+    const field = extrude(outline(0.8), 0.12, M.green, 0.04);
+    field.position.z = 0.15;
+    const star = extrude(rubElHizb(0.32), 0.06, M.gold, 0.025);
+    star.position.set(0, 0.05, 0.27);
+    return group(rim, field, star);
+  },
+  tasbeeh() {
+    const g = new THREE.Group();
+    const N = 33;
+    const curve = new THREE.CatmullRomCurve3(
+      Array.from({ length: 24 }, (_, i) => {
+        const a = (i / 24) * Math.PI * 2;
+        return new THREE.Vector3(Math.cos(a) * 0.95, Math.sin(a) * 0.75 + 0.2, Math.sin(a * 2) * 0.08);
+      }),
+      true,
+    );
+    const bead = new THREE.SphereGeometry(0.11, 48, 32);
+    for (let i = 0; i < N; i++) {
+      // Spread the beads around the loop, leaving a small gap at the bottom (t = 0.75) for the imam bead.
+      const t = 0.75 + 0.025 + (i / (N - 1)) * 0.95;
+      const p = curve.getPointAt(t % 1);
+      const m = new THREE.Mesh(bead, i % 11 === 10 ? M.gold : M.green);
+      m.position.copy(p);
+      g.add(m);
+    }
+    // Imam bead and tassel hang from the bottom of the loop.
+    const bottom = curve.getPointAt(0.75);
+    const imam = lathe([[0.001, -0.2], [0.12, -0.16], [0.15, 0], [0.12, 0.16], [0.001, 0.2]], M.gold);
+    imam.position.set(bottom.x, bottom.y - 0.2, bottom.z);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.07, 32, 24), M.goldDeep);
+    cap.position.set(bottom.x, bottom.y - 0.45, bottom.z);
+    const tassel = lathe([[0.001, 0], [0.05, -0.02], [0.13, -0.35], [0.16, -0.5], [0.001, -0.5]], M.goldDeep);
+    tassel.position.set(bottom.x, bottom.y - 0.5, bottom.z);
+    g.add(imam, cap, tassel);
+    return g;
+  },
+  quran() {
+    // Closed book: green cover, ivory page block, gold corner plates and clasp. No title.
+    const cover = new THREE.Mesh(new RoundedBoxGeometry(1.5, 1.95, 0.42, 6, 0.06), M.green);
+    const pages = new THREE.Mesh(new RoundedBoxGeometry(1.42, 1.85, 0.34, 4, 0.03), M.ivory);
+    pages.position.set(0.06, 0, 0);
+    const front = new THREE.Mesh(new RoundedBoxGeometry(1.5, 1.95, 0.06, 6, 0.03), M.green);
+    front.position.z = 0.2;
+    const back = front.clone();
+    back.position.z = -0.2;
+    const spine = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.23, 1.95, 48, 1, false, Math.PI, Math.PI), M.greenDeep);
+    spine.position.x = -0.74;
+    const medal = extrude(rubElHizb(0.38), 0.05, M.gold, 0.02);
+    medal.position.set(0.02, 0, 0.25);
+    const frame = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.025, 16, 96), M.gold);
+    frame.position.set(0.02, 0, 0.24);
+    const corner = (x, y, rz) => {
+      const s = new THREE.Shape();
+      s.moveTo(0, 0); s.lineTo(0.32, 0); s.quadraticCurveTo(0.08, 0.08, 0, 0.32); s.closePath();
+      const m = extrude(s, 0.03, M.gold, 0.012);
+      m.position.set(x, y, 0.245);
+      m.rotation.z = rz;
+      return m;
+    };
+    const g = group(back, pages, front, spine, medal, frame,
+      corner(0.6, 0.83, Math.PI), corner(0.6, -0.83, Math.PI / 2), corner(-0.55, 0.83, -Math.PI / 2), corner(-0.55, -0.83, 0));
+    g.rotation.set(0.12, -0.42, 0.06);
+    return g;
+  },
+  khatmah() {
+    // Open book resting on a rehal (folding stand). Pages are blank.
+    const g = new THREE.Group();
+    const pageGeo = () => {
+      const geo = new THREE.BoxGeometry(1.15, 0.06, 1.5, 32, 1, 1);
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const t = x / 1.15 + 0.5; // 0 at spine .. 1 at edge
+        pos.setY(i, pos.getY(i) + Math.sin(t * Math.PI * 0.9) * 0.22 - t * 0.05);
+      }
+      geo.computeVertexNormals();
+      return geo;
+    };
+    const left = new THREE.Mesh(pageGeo(), M.ivory);
+    left.position.x = -0.58;
+    left.rotation.y = Math.PI;
+    const right = new THREE.Mesh(pageGeo(), M.ivory);
+    right.position.x = 0.58;
+    const coverGeo = new RoundedBoxGeometry(2.45, 0.05, 1.62, 4, 0.02);
+    const cover = new THREE.Mesh(coverGeo, M.green);
+    cover.position.y = -0.06;
+    const ribbon = new THREE.Mesh(new RoundedBoxGeometry(0.08, 0.02, 1.0, 2, 0.008), M.gold);
+    ribbon.position.set(0.02, 0.17, 0.55);
+    ribbon.rotation.x = 0.35;
+    const book = group(cover, left, right, ribbon);
+    book.rotation.x = 0.55;
+    book.position.y = 0.2;
+    // Rehal: two crossed boards.
+    const board = (rz) => {
+      const s = new THREE.Shape();
+      s.moveTo(-0.15, -0.9); s.lineTo(0.15, -0.9); s.lineTo(0.22, 0.6); s.quadraticCurveTo(0, 0.78, -0.22, 0.6); s.closePath();
+      const m = extrude(s, 0.08, M.gold, 0.025);
+      m.rotation.z = rz;
+      m.position.y = -0.45;
+      return m;
+    };
+    const stand = group(board(0.9), board(-0.9));
+    stand.position.z = -0.1;
+    g.add(stand, book);
+    return g;
+  },
+};
+
+// ── Scene: same camera, lights and shadow for every icon ────────────────────
+function render(name) {
+  const scene = new THREE.Scene();
+  scene.environment = envTex;
+  const camera = new THREE.PerspectiveCamera(26, 1, 0.1, 100);
+  camera.position.set(0.9, 1.4, 9);
+  camera.lookAt(0, -0.1, 0);
+
+  const key = new THREE.DirectionalLight(0xfff4e0, 2.6);
+  key.position.set(-2, 7, 3);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.radius = 8;
+  key.shadow.camera.left = key.shadow.camera.bottom = -5;
+  key.shadow.camera.right = key.shadow.camera.top = 5;
+  key.shadow.camera.near = 0.5;
+  key.shadow.camera.far = 20;
+  key.shadow.bias = -0.0004;
+  key.shadow.normalBias = 0.02;
+  const rim = new THREE.DirectionalLight(0xbfe8d0, 1.2);
+  rim.position.set(4, 2, -3);
+  const fill = new THREE.HemisphereLight(0xfff8ee, 0x0b3a28, 0.5);
+  scene.add(key, rim, fill);
+
+  const model = MODELS[name]();
+  model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  // Normalise: every icon fills the same box, so proportions match across the set.
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const scale = 2.5 / Math.max(size.x, size.y);
+  model.scale.multiplyScalar(scale);
+  const box2 = new THREE.Box3().setFromObject(model);
+  const c = box2.getCenter(new THREE.Vector3());
+  model.position.sub(c);
+  model.position.y += 0.1;
+  scene.add(model);
+
+  const floorY = new THREE.Box3().setFromObject(model).min.y - 0.02;
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.ShadowMaterial({ opacity: 0.28 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = floorY;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  renderer.render(scene, camera);
+  return renderer.domElement.toDataURL("image/png");
+}
+
+window.MODEL_NAMES = Object.keys(MODELS);
+window.renderIcon = render;
+window.ready = true;
+</script>
+</body>
+</html>

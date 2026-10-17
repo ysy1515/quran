@@ -1,10 +1,9 @@
 import { useId, type ReactNode } from "react";
 
 // Large feature artwork for tiles. Two tracks share one slot:
-//  1. Professional 3D renders: drop `src/assets/feature-art/<name>.webp` (or .png)
-//     and it is used automatically, no code change needed (see README there).
-//  2. Until then, the layered SVG placeholders below are drawn. They are interim
-//     artwork, not the final 3D standard.
+//  1. 3D renders in `src/assets/feature-art/<name>.webp` (or .png) are used
+//     automatically (see README there; rendered by tools/feature-art).
+//  2. The layered SVG drawings below are the fallback for any name without a file.
 
 export type FeatureArtName =
   | "morning"

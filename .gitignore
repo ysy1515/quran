@@ -65,3 +65,4 @@ google-services.json
 # Playwright
 artifacts/quran/test-results/
 artifacts/quran/playwright-report/
+artifacts/quran/tools/feature-art/out/

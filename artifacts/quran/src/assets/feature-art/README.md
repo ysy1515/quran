@@ -1,8 +1,11 @@
 # Feature artwork (3D assets)
 
 Tiles use `<FeatureArt name="…" />`. If a file named after the art exists in this
-folder, it is used automatically; otherwise an interim layered-SVG placeholder is
-drawn. No code changes are needed to switch to professional 3D renders.
+folder, it is used automatically; otherwise a layered-SVG fallback is drawn.
+
+The current files are 3D renders made with `tools/feature-art` (procedural
+three.js models, one shared scene and material set). A designer's file with the
+same name replaces any of them with no code change.
 
 | File name (`.webp`, or `.png`) | Used on |
 |---|---|
@@ -16,7 +19,7 @@ drawn. No code changes are needed to switch to professional 3D renders.
 | `istiazah` | Athkar: الاستعاذات |
 | `tasbeeh` | Athkar: عداد التسبيح |
 | `khatmah` | Home: khatmah setup |
-| `quran` | reserved |
+| `quran` | reserved (rendered, not yet placed) |
 
 Asset spec for the designer:
 - One material family: brushed gold and warm ivory details, with deep-green

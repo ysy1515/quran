@@ -8,8 +8,12 @@ import { useReadingTime } from "@/lib/readingTime";
 import { REMINDER_TEXT, remindersSupported, setReminder, useReminders, type ReminderId } from "@/lib/reminders";
 import { useDhikrState } from "@/lib/dhikr";
 import { rateApp, shareApp } from "@/lib/appActions";
-import { ar, durationLabel, shortDate } from "@/lib/format";
+import { ayahCount, surahName } from "@workspace/quran-meta";
+import { ar, ayatLabel, durationLabel, shortDate } from "@/lib/format";
 import { readerHref } from "@/lib/useQuranLinks";
+
+/** The quick list of the last ten surahs from the previous home screen, An-Nas first. */
+const SHORT_SURAHS = Array.from({ length: 10 }, (_, i) => 114 - i);
 
 function Badge({ children }: { children: React.ReactNode }) {
   return <span className="badge-count">{children}</span>;
@@ -85,6 +89,12 @@ export default function More() {
           <ListRow icon="book" href={readerHref({ surah: 18, ayah: 1 })} label="سورة الكهف" hint="يُستحب قراءتها يوم الجمعة" />
           <ListRow icon="moon" href={readerHref({ surah: 67, ayah: 1 })} label="سورة الملك" hint="قبل النوم" />
           <ListRow icon="book" href={readerHref({ surah: 2, ayah: 1 })} label="سورة البقرة" />
+        </ListSection>
+
+        <ListSection title="قصار السور">
+          {SHORT_SURAHS.map((n) => (
+            <ListRow key={n} href={`/mushaf/${n}`} label={`سورة ${surahName(n)}`} value={ayatLabel(ayahCount(n))} testId={`short-surah-${n}`} />
+          ))}
         </ListSection>
 
         <ListSection title="التذكيرات" footer={webNote}>
