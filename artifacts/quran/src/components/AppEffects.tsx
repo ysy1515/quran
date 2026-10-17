@@ -5,6 +5,7 @@ import { useLocalNotifications } from "@/hooks/useLocalNotifications";
 import { useAdhanPrefs, useCoords } from "@/lib/prayer";
 import { syncReminders } from "@/lib/reminders";
 import { isCapacitorNative } from "@/lib/appConfig";
+import { notificationRoute } from "@/lib/notificationRoute";
 
 /**
  * App-wide side effects that must run whichever screen is open:
@@ -39,8 +40,8 @@ export default function AppEffects() {
     import("@capacitor/local-notifications")
       .then(({ LocalNotifications }) =>
         LocalNotifications.addListener("localNotificationActionPerformed", (e) => {
-          const route = (e.notification.extra as { route?: unknown } | undefined)?.route;
-          if (typeof route === "string" && route.startsWith("/")) navigate(route);
+          const route = notificationRoute(e.notification.extra);
+          if (route) navigate(route);
         }),
       )
       .then((handle) => {

@@ -93,7 +93,7 @@ function ProgressBlock() {
   return (
     <section className="mt-8" aria-labelledby="khatmah-progress-title">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 id="khatmah-progress-title" className="text-lg font-bold text-foreground">
+        <h2 id="khatmah-progress-title" className="text-lg font-bold text-foreground" data-testid="khatmah-progress-title">
           {k.fullPlan ? "الختمة الحالية" : `خطة القراءة من ${juzLabel(k.plan!.startJuz)}`}
         </h2>
         <span className="text-sm font-bold text-muted-foreground">{ar(pct)}٪</span>

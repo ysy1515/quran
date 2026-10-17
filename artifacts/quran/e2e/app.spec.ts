@@ -118,6 +118,23 @@ test.describe("khatmah", () => {
     await expect(page.getByText("الورد ١")).toBeVisible();
   });
 
+  test("a plan from a later juz finishes as a reading plan, not a full khatmah", async ({ page }) => {
+    await open(page, "/khatmah/new");
+    await page.getByTestId("plan-juz").click();
+    await page.getByTestId("start-juz").selectOption("29");
+    await expect(page.getByTestId("plan-summary")).toContainText("خطة قراءة من الجزء التاسع والعشرون");
+    await page.getByTestId("create-khatmah").click();
+    await expect(page.getByTestId("khatmah-progress-title")).toContainText("خطة القراءة");
+    await page.getByTestId("finish-wird").click();
+    await page.getByTestId("finish-wird").click();
+    await expect(page.getByTestId("khatmah-finished")).toContainText("أتممت خطة القراءة");
+    await expect(page.getByTestId("khatmah-finished")).toContainText("لا تُحسب ختمة كاملة");
+
+    await page.goto("/more");
+    await expect(page.getByTestId("stat-khatmas")).toContainText("٠");
+    await expect(page.getByTestId("stat-partial-plans")).toContainText("١");
+  });
+
   test("continue reading opens the reader inside the wird", async ({ page }) => {
     await open(page, "/", {
       "quran.khatmah.v1": {
