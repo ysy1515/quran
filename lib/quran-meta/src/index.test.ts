@@ -2,14 +2,24 @@ import { describe, expect, it } from "vitest";
 import {
   AYAH_COUNTS,
   JUZ_STARTS,
+  LAST_AYAH,
+  RUB_STARTS,
+  compareAyah,
+  previousAyah,
+  rubStart,
   PAGE_STARTS,
   SAJDAH_AYAT,
   TOTAL_AYAHS,
   ayahCount,
   isSajdahAyah,
   isValidAyah,
+  juzOfAyah,
   juzStart,
+  pageEnd,
+  pageOfAyah,
+  pageStart,
   shouldShowBasmalahHeader,
+  surahName,
 } from "./index";
 
 // Independent spot checks (Hafs, standard Madani numbering), written separately
@@ -94,5 +104,69 @@ describe("shouldShowBasmalahHeader", () => {
       if (s === 1 || s === 9) continue;
       expect(shouldShowBasmalahHeader(s)).toBe(true);
     }
+  });
+});
+
+describe("page and juz helpers", () => {
+  it("names surahs from the generated table", () => {
+    expect(surahName(1)).toBe("الفاتحة");
+    expect(surahName(2)).toBe("البقرة");
+    expect(surahName(18)).toBe("الكهف");
+    expect(surahName(67)).toBe("الملك");
+    expect(surahName(114)).toBe("الناس");
+    expect(() => surahName(115)).toThrow(RangeError);
+  });
+
+  it("finds page boundaries of the Madani mushaf", () => {
+    expect(pageStart(1)).toEqual({ surah: 1, ayah: 1 });
+    expect(pageEnd(1)).toEqual({ surah: 1, ayah: 7 });
+    expect(pageStart(2)).toEqual({ surah: 2, ayah: 1 });
+    expect(pageEnd(2)).toEqual({ surah: 2, ayah: 5 });
+    expect(pageEnd(604)).toEqual({ surah: 114, ayah: 6 });
+  });
+
+  it("maps ayat to pages and back", () => {
+    expect(pageOfAyah(1, 1)).toBe(1);
+    expect(pageOfAyah(1, 7)).toBe(1);
+    expect(pageOfAyah(2, 1)).toBe(2);
+    expect(pageOfAyah(2, 25)).toBe(5);
+    expect(pageOfAyah(18, 1)).toBe(293);
+    expect(pageOfAyah(67, 1)).toBe(562);
+    expect(pageOfAyah(114, 6)).toBe(604);
+    for (let p = 1; p <= 604; p++) {
+      const s = pageStart(p);
+      const e = pageEnd(p);
+      expect(pageOfAyah(s.surah, s.ayah)).toBe(p);
+      expect(pageOfAyah(e.surah, e.ayah)).toBe(p);
+    }
+  });
+
+  it("maps ayat to juz", () => {
+    expect(juzOfAyah(1, 1)).toBe(1);
+    expect(juzOfAyah(2, 141)).toBe(1);
+    expect(juzOfAyah(2, 142)).toBe(2);
+    expect(juzOfAyah(67, 1)).toBe(29);
+    expect(juzOfAyah(114, 6)).toBe(30);
+  });
+});
+
+describe("hizb quarters", () => {
+  it("has 240 quarters that line up with juz boundaries", () => {
+    expect(RUB_STARTS).toHaveLength(240);
+    expect(rubStart(1)).toEqual({ surah: 1, ayah: 1 });
+    expect(rubStart(2)).toEqual({ surah: 2, ayah: 26 });
+    for (let juz = 1; juz <= 30; juz++) {
+      expect(rubStart((juz - 1) * 8 + 1)).toEqual(juzStart(juz));
+    }
+    for (let i = 1; i < 240; i++) {
+      expect(compareAyah(rubStart(i), rubStart(i + 1))).toBeLessThan(0);
+    }
+  });
+
+  it("steps back across surah boundaries", () => {
+    expect(previousAyah({ surah: 2, ayah: 26 })).toEqual({ surah: 2, ayah: 25 });
+    expect(previousAyah({ surah: 2, ayah: 1 })).toEqual({ surah: 1, ayah: 7 });
+    expect(previousAyah({ surah: 1, ayah: 1 })).toBeNull();
+    expect(LAST_AYAH).toEqual({ surah: 114, ayah: AYAH_COUNTS[113] });
   });
 });

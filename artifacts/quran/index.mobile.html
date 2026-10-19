@@ -8,7 +8,9 @@
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#1a4731" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>القرآن الكريم</title>
+    <title>مصحفك – القرآن الكريم والأذكار</title>
+    <meta name="description" content="مصحفك معك: القرآن الكريم، ورد يومي وختمة، الأذكار ومواقيت الصلاة." />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
     <!--
@@ -54,18 +56,7 @@
       @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 
-    <!--
-      Google Fonts loaded non-blocking via preload + JS.
-      If network is unavailable (Capacitor offline startup),
-      fonts fall back to system Arabic fonts without blocking render.
-    -->
-    <link rel="preload" as="style"
-      href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Cairo:wght@400;500;600;700;800&family=Scheherazade+New:wght@400;700&display=swap"
-      onload="this.rel='stylesheet'" />
-    <noscript>
-      <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Cairo:wght@400;500;600;700;800&family=Scheherazade+New:wght@400;700&display=swap" />
-    </noscript>
+    <!-- Fonts (Cairo, Amiri Quran) are bundled with the app, so they work offline. -->
   </head>
   <body>
     <!--

@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="fonts.css">
+<style>
+body{margin:0;background:#EFE9DA;font-family:Cairo;width:1500px;padding:30px;box-sizing:border-box}
+h1{font:700 30px Cairo;color:#0B3D2A;margin:0 0 20px}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.card{background:#fff;border-radius:22px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.08)}
+.hero{height:380px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:radial-gradient(circle at 50% 30%,#145A3E,#0B3D2A 65%,#062A1C)}
+.hero.light{background:#F6F0E1}
+.wm{color:#D6AE5C;line-height:1.1}
+.tag{font:600 20px Cairo;color:#E9D7A8;opacity:.9}
+.icons{display:flex;gap:18px;align-items:flex-end;justify-content:center;padding:18px;background:#F6F0E1}
+.icons svg{border-radius:22.37%;box-shadow:0 4px 12px rgba(0,0,0,.18)}
+.meta{padding:12px 20px 18px;color:#20302a}
+.meta b{font-size:20px;color:#0B3D2A}
+</style><script src="symbols.js"></script></head><body dir="rtl">
+<h1>مصحفك — ثلاثة اتجاهات للشعار</h1>
+<div class="row">
+  <div class="card"><div class="hero" id="a"></div><div class="icons" id="ai"></div><div class="meta"><b>A · الشعار الوسامي (Emblem)</b></div></div>
+  <div class="card"><div class="hero" id="b"></div><div class="icons" id="bi"></div><div class="meta"><b>B · الأيقونة أولًا (App icon first)</b></div></div>
+  <div class="card"><div class="hero" id="c"></div><div class="icons" id="ci"></div><div class="meta"><b>C · الشعار الكتابي (Wordmark)</b></div></div>
+</div>
+<script>
+// A: emblem — Rub el Hizb frame around a medallion holding the open Mushaf.
+function emblem(size){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 100 100">${defs}
+  <polygon points="${star8(50,50,47)}" fill="url(#gold)"/>
+  <polygon points="${star8(50,50,43.5)}" fill="#0B3D2A"/>
+  <circle cx="50" cy="50" r="31" fill="none" stroke="url(#gold)" stroke-width="1.6"/>
+  <g transform="translate(50 54) scale(0.5) translate(-50 -58)">${mushafSymbol({star:"none"}).replace(/<polygon[^>]*>/g,"")}</g>
+  </svg>`;
+}
+document.getElementById("a").innerHTML = emblem(210) + `<div class="wm" style="font:700 64px Amiri">مصحفك</div><div class="tag">مصحفك معك</div>`;
+document.getElementById("ai").innerHTML = [120,60,40].map(s=>`<svg width="${s}" height="${s}" viewBox="0 0 100 100">${defs}<rect width="100" height="100" fill="url(#bg)"/><g transform="translate(50 50) scale(0.82) translate(-50 -50)">${emblem(100).replace(/^<svg[^>]*>|<\/svg>$/g,"")}</g></svg>`).join("");
+
+// B: app-icon-first — the squircle icon is the logo; wordmark sits beside it.
+document.getElementById("b").innerHTML = `<div style="display:flex;align-items:center;gap:22px">${appIcon(150).replace("<svg","<svg style='border-radius:22.37%;box-shadow:0 10px 30px rgba(0,0,0,.35)'")}<div><div class="wm" style="font:700 78px Messiri">مصحفك</div><div class="tag" style="text-align:center">مصحفك معك</div></div></div>`;
+document.getElementById("bi").innerHTML = [120,60,40].map(s=>appIcon(s)).join("");
+
+// C: wordmark — the name set in Ruqaa with a Rub el Hizb mark as its signature accent.
+document.getElementById("c").innerHTML = `<div style="display:flex;align-items:center;gap:14px"><svg width="54" height="54" viewBox="0 0 100 100">${defs}<polygon points="${star8(50,50,46)}" fill="url(#gold)"/><polygon points="${star8(50,50,20)}" fill="#0B3D2A"/></svg><div class="wm" style="font:700 104px ArefRuqaa">مصحفك</div></div><div class="tag">مصحفك معك</div>`;
+document.getElementById("ci").innerHTML = [120,60,40].map(s=>`<svg width="${s}" height="${s}" viewBox="0 0 100 100">${defs}<rect width="100" height="100" fill="url(#bg)"/><text x="50" y="62" text-anchor="middle" font-family="ArefRuqaa" font-size="34" fill="url(#gold)">مصحفك</text></svg>`).join("");
+</script></body></html>

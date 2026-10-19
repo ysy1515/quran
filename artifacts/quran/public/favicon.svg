@@ -1,3 +1,19 @@
-<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="180" height="180" rx="36" fill="#FF3C00"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 100 100">
+<defs>
+  <linearGradient id="gold" x1="0" y1="0" x2="0.6" y2="1">
+    <stop offset="0" stop-color="#F1D894"/><stop offset="0.55" stop-color="#D6AE5C"/><stop offset="1" stop-color="#A97C2F"/>
+  </linearGradient>
+  <radialGradient id="bg" cx="0.5" cy="0.32" r="0.85">
+    <stop offset="0" stop-color="#145A3E"/><stop offset="0.65" stop-color="#0B3D2A"/><stop offset="1" stop-color="#062A1C"/>
+  </radialGradient>
+</defs><rect width="100" height="100" fill="url(#bg)"/><g transform="translate(50 54) scale(0.9) translate(-50 -58)">
+  <path d="M50 78 C42 72 30 69 17 70 L17 38 C30 37 42 40 50 46 Z" fill="#F6F0E1"/><path d="M50 78 C58 72 70 69 83 70 L83 38 C70 37 58 40 50 46 Z" fill="#F6F0E1"/>
+  <path d="M23 50 C32 49.5 40 51.5 46 54.5" stroke="#D6AE5C" stroke-opacity="0.55" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+       <path d="M77 50 C68 49.5 60 51.5 54 54.5" stroke="#D6AE5C" stroke-opacity="0.55" stroke-width="1.1" fill="none" stroke-linecap="round"/><path d="M23 56 C32 55.5 40 57.5 46 60.5" stroke="#D6AE5C" stroke-opacity="0.55" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+       <path d="M77 56 C68 55.5 60 57.5 54 60.5" stroke="#D6AE5C" stroke-opacity="0.55" stroke-width="1.1" fill="none" stroke-linecap="round"/><path d="M23 62 C32 61.5 40 63.5 46 66.5" stroke="#D6AE5C" stroke-opacity="0.55" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+       <path d="M77 62 C68 61.5 60 63.5 54 66.5" stroke="#D6AE5C" stroke-opacity="0.55" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+  <path d="M50 82 C41 76 28 73 13 74 L13 42 L17 41.5 L17 70 C30 69 42 72 50 78 Z" fill="url(#gold)"/><path d="M50 82 C59 76 72 73 87 74 L87 42 L83 41.5 L83 70 C70 69 58 72 50 78 Z" fill="url(#gold)"/>
+  <path d="M50 46 L50 78" stroke="#A97C2F" stroke-width="1" stroke-opacity="0.6"/>
+  <path d="M46.6 79 L53.4 79 L53.4 94 L50 90.6 L46.6 94 Z" fill="#F1D894"/>
+  <polygon points="60.62,29.40 56.22,31.22 54.40,35.62 50.00,33.80 45.60,35.62 43.78,31.22 39.38,29.40 41.20,25.00 39.38,20.60 43.78,18.78 45.60,14.38 50.00,16.20 54.40,14.38 56.22,18.78 60.62,20.60 58.80,25.00" fill="url(#gold)"/>
+  <polygon points="54.80,26.99 52.81,27.81 51.99,29.80 50.00,28.98 48.01,29.80 47.19,27.81 45.20,26.99 46.02,25.00 45.20,23.01 47.19,22.19 48.01,20.20 50.00,21.02 51.99,20.20 52.81,22.19 54.80,23.01 53.98,25.00" fill="#0B3D2A" opacity="0.9"/></g></svg>

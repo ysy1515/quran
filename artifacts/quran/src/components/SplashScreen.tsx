@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { BRAND, BrandSymbol } from "@/components/brand/Brand";
 
 interface SplashScreenProps {
   onDone: () => void;
@@ -123,7 +124,7 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
                 <IslamicOrnament className="w-full h-full" />
               </motion.div>
 
-              {/* Center "ق" emblem */}
+              {/* Center brand mark */}
               <motion.div
                 className="relative z-10 flex items-center justify-center"
                 initial={{ scale: 0, opacity: 0 }}
@@ -131,24 +132,19 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
                 transition={{ delay: 0.3, duration: 0.7, ease: [0.34, 1.56, 0.64, 1] }}
               >
                 <div
-                  className="w-20 h-20 rounded-full flex items-center justify-center"
+                  className="w-24 h-24 rounded-full flex items-center justify-center"
                   style={{
                     background: "radial-gradient(circle, rgba(134,239,172,0.15) 0%, rgba(134,239,172,0.05) 100%)",
                     border: "1px solid rgba(134,239,172,0.3)",
                     boxShadow: "0 0 30px rgba(134,239,172,0.15), inset 0 0 20px rgba(134,239,172,0.05)",
                   }}
                 >
-                  <span
-                    className="text-green-300 font-bold select-none"
-                    style={{ fontFamily: "'Scheherazade New', serif", fontSize: "2.8rem", lineHeight: 1 }}
-                  >
-                    ق
-                  </span>
+                  <BrandSymbol size={54} />
                 </div>
               </motion.div>
             </div>
 
-            {/* Title: القرآن الكريم */}
+            {/* Brand name and tagline */}
             <motion.div
               className="text-center"
               initial={{ opacity: 0, y: 20 }}
@@ -156,16 +152,14 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
               transition={{ delay: 0.6, duration: 0.7, ease: "easeOut" }}
             >
               <h1
-                className="text-green-100 font-bold tracking-wide"
-                style={{
-                  fontFamily: "'Scheherazade New', 'Amiri', serif",
-                  fontSize: "clamp(2rem, 8vw, 3rem)",
-                  textShadow: "0 0 40px rgba(134,239,172,0.3)",
-                  letterSpacing: "0.05em",
-                }}
+                className="brand-wordmark"
+                style={{ color: "#D6AE5C", fontSize: "clamp(2.6rem, 11vw, 3.6rem)", textShadow: "0 0 40px rgba(214,174,92,0.25)" }}
               >
-                القُرآنُ الكَريمُ
+                {BRAND.name}
               </h1>
+              <p className="font-semibold mt-1" style={{ color: "rgba(246,240,225,0.8)", fontSize: "1.05rem" }}>
+                {BRAND.tagline}
+              </p>
             </motion.div>
 
             {/* Decorative divider */}

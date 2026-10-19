@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "com.yahya.quran",
-  appName: "القرآن الكريم",
+  appName: "مصحفك",
   webDir: "dist/mobile",
   bundledWebRuntime: false,
   plugins: {
@@ -30,7 +30,8 @@ const config: CapacitorConfig = {
   },
   ios: {
     backgroundColor: "#1a4731",
-    contentInset: "automatic",
+    // The web layer draws edge to edge and pads itself with env(safe-area-inset-*).
+    contentInset: "never",
     limitsNavigationsToAppBoundDomains: true,
   },
   server: {

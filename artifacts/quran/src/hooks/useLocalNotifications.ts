@@ -186,7 +186,7 @@ export function useLocalNotifications() {
               schedule: { at: notifTime },
               channelId: "prayer-reminders",
               smallIcon: "ic_notification",
-              extra: { prayer: prayer.key, day: String(dayOffset) },
+              extra: { prayer: prayer.key, day: String(dayOffset), route: "/adhan" },
             });
           }
         }

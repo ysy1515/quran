@@ -1,155 +1,266 @@
-import { Link } from "wouter";
-import {
-  useListSurahs,
-  getListSurahsQueryKey,
-} from "@workspace/api-client-react";
-import { readingStats, useReadingProgress } from "@/lib/userData";
+import { Link, useLocation } from "wouter";
+import { toast } from "sonner";
+import { useGetPage, getGetPageQueryKey } from "@workspace/api-client-react";
+import { surahName, compareAyah, type AyahRef } from "@workspace/quran-meta";
+import Screen from "@/components/shell/Screen";
+import { Icon } from "@/components/icons/Icon";
+import FeatureArt from "@/components/art/FeatureArt";
+import { completeCurrentPortion, isWithin, undoLastPortion, useKhatmah, type Portion } from "@/lib/khatmah";
+import { useReadingProgress } from "@/lib/userData";
+import { ar, awradLabel, juzLabel, shortDate } from "@/lib/format";
+import { readerHref } from "@/lib/useQuranLinks";
+import { shareOrCopy } from "@/lib/share";
+import { hapticSuccess } from "@/lib/haptics";
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function refLabel(ref: AyahRef) {
+  return `سورة ${surahName(ref.surah)} - آية ${ar(ref.ayah)}`;
+}
+
+/** Opening ayat of the portion, exactly as served by the Quran source. */
+function AyahPreview({ portion }: { portion: Portion }) {
+  const { data, isLoading, isError } = useGetPage(portion.fromPage, {
+    query: { queryKey: getGetPageQueryKey(portion.fromPage) },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3 py-6" aria-label="جاري تحميل الآيات">
+        <div className="skeleton h-6 rounded-lg w-11/12 mx-auto" />
+        <div className="skeleton h-6 rounded-lg w-8/12 mx-auto" />
+      </div>
+    );
+  }
+  const verses = Array.isArray(data?.verses) ? data.verses : [];
+  const start = verses.findIndex((v) => v.verseKey === `${portion.from.surah}:${portion.from.ayah}`);
+  if (isError || start < 0) {
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground" data-testid="wird-preview-unavailable">
+        تعذّر تحميل نص الآيات الآن. يمكنك متابعة القراءة من المصحف.
+      </p>
+    );
+  }
+  const first = verses[start]!;
+  const shown = [first];
+  const second = verses[start + 1];
+  if (second && first.text.length < 70 && second.verseKey.startsWith(`${portion.from.surah}:`)) shown.push(second);
+
+  // Long opening ayat get a smaller size so the card keeps its shape.
+  const length = shown.reduce((n, v) => n + v.text.length, 0);
+  const size = length <= 90 ? "text-[1.45rem]" : length <= 220 ? "text-[1.25rem]" : "text-[1.1rem]";
+
   return (
-    <div className="bg-card rounded-xl p-4 border border-border text-center">
-      <div className="text-2xl font-bold text-primary">{value}</div>
-      <div className="text-xs text-muted-foreground mt-1">{label}</div>
-    </div>
+    <p className={`font-quran text-center text-foreground py-5 px-1 leading-[2.25] ${size}`} dir="rtl" data-testid="wird-preview">
+      <span className="text-gold-deep">﴿</span>
+      {shown.map((v) => (
+        <span key={v.verseKey}>
+          {v.text}
+          <span className="ayah-mark">{ar(v.verseNumber)}</span>
+        </span>
+      ))}
+      <span className="text-gold-deep">﴾</span>
+    </p>
   );
 }
 
-function QuickSurah({ number, name, versesCount }: { number: number; name: string; versesCount: number }) {
+function WirdCard({ portion }: { portion: Portion }) {
+  return (
+    <article className="card card--raised overflow-hidden" data-testid="wird-card">
+      <div className="flex items-center justify-between px-5 pt-4 text-[0.95rem] font-bold text-primary dark:text-gold">
+        <span>من قوله تعالى</span>
+        <span>{juzLabel(portion.juz)}</span>
+      </div>
+      <div className="px-4">
+        <AyahPreview portion={portion} />
+      </div>
+      <dl className="px-5 pb-4 text-[0.95rem] font-bold text-primary dark:text-gold">
+        <div className="flex items-center justify-between py-3">
+          <dt>{refLabel(portion.from)}</dt>
+          <dd>صفحة {ar(portion.fromPage)}</dd>
+        </div>
+        <div className="gold-divider !my-0" />
+        <div className="flex items-center justify-between py-3">
+          <dt>إلى {refLabel(portion.to)}</dt>
+          <dd>صفحة {ar(portion.toPage)}</dd>
+        </div>
+      </dl>
+    </article>
+  );
+}
+
+function ProgressBlock() {
+  const k = useKhatmah();
+  const pct = Math.round(k.progress * 100);
+  return (
+    <section className="mt-8" aria-labelledby="khatmah-progress-title">
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 id="khatmah-progress-title" className="text-lg font-bold text-foreground" data-testid="khatmah-progress-title">
+          {k.fullPlan ? "الختمة الحالية" : `خطة القراءة من ${juzLabel(k.plan!.startJuz)}`}
+        </h2>
+        <span className="text-sm font-bold text-muted-foreground">{ar(pct)}٪</span>
+      </div>
+      <div
+        className="relative h-3 rounded-full bg-muted border border-border overflow-hidden"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={k.total}
+        aria-valuenow={k.completed}
+        aria-valuetext={`${ar(k.completed)} من ${awradLabel(k.total)}`}
+        data-testid="khatmah-progress"
+      >
+        <div
+          className="absolute inset-y-0 right-0 rounded-full bg-gradient-to-l from-primary to-[hsl(150_38%_34%)] dark:from-gold dark:to-gold-deep transition-[width] duration-500"
+          style={{ width: `${Math.max(pct, k.completed > 0 ? 2 : 0)}%` }}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3 mt-4">
+        <Link href="/khatmah/portions/previous" className="card press px-4 py-3 flex items-center justify-between" data-testid="previous-portions">
+          <span className="text-sm font-bold text-muted-foreground">الأوراد السابقة</span>
+          <span className="text-lg font-extrabold text-foreground">{ar(k.completed)}</span>
+        </Link>
+        <Link href="/khatmah/portions/upcoming" className="card press px-4 py-3 flex items-center justify-between" data-testid="upcoming-portions">
+          <span className="text-sm font-bold text-muted-foreground">الأوراد القادمة</span>
+          <span className="text-lg font-extrabold text-foreground">{ar(k.upcoming)}</span>
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function ContinueReading() {
+  const progress = useReadingProgress();
+  if (!progress) return null;
+  const ref = { surah: progress.lastSurahNumber, ayah: progress.lastVerseNumber };
   return (
     <Link
-      href={`/mushaf/${number}`}
-      className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer border border-transparent hover:border-border"
+      href={readerHref(ref)}
+      className="card press mt-6 flex items-center gap-4 px-5 py-4"
+      data-testid="continue-reading"
     >
-      <div className="verse-number text-xs">{number}</div>
-      <div className="flex-1 min-w-0">
-        <div className="font-quran text-base text-foreground">{name}</div>
-        <div className="text-xs text-muted-foreground">{versesCount} آية</div>
-      </div>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-4 h-4 text-muted-foreground rotate-180">
-        <polyline points="9 18 15 12 9 6" />
-      </svg>
+      <span className="list-row__icon !w-11 !h-11 !rounded-2xl" aria-hidden="true">
+        <Icon name="book" size={22} strokeWidth={2} />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-xs font-bold text-muted-foreground">متابعة القراءة من آخر موضع</span>
+        <span className="block text-base font-bold text-foreground truncate">
+          سورة {progress.lastSurahName}، آية {ar(progress.lastVerseNumber)}
+        </span>
+        <span className="block text-xs text-muted-foreground">صفحة {ar(progress.lastPageNumber)}</span>
+      </span>
+      <Icon name="chevronEnd" size={20} className="text-muted-foreground" />
     </Link>
   );
 }
 
+function StartKhatmah() {
+  return (
+    <div className="card card--raised overflow-hidden text-center px-6 pt-6 pb-6" data-testid="khatmah-empty">
+      <div className="mx-auto mb-2 w-[132px] h-[132px] rounded-[32px] grid place-items-center bg-gradient-to-b from-[hsl(152_42%_22%)] to-[hsl(156_44%_12%)] shadow-[var(--elev-2)]">
+        <FeatureArt name="khatmah" size={108} />
+      </div>
+      <h2 className="text-xl font-extrabold text-foreground mt-3">ابدأ ختمتك مع مصحفك</h2>
+      <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+        قسّم المصحف إلى أوراد يومية، وتابع ورد اليوم، وسجّل ما أتممته حتى تختم القرآن الكريم.
+      </p>
+      <Link href="/khatmah/new" className="btn btn-primary w-full mt-5" data-testid="start-khatmah">
+        <Icon name="plus" size={20} strokeWidth={2.2} />
+        بدء ختمة جديدة
+      </Link>
+    </div>
+  );
+}
+
+function FinishedKhatmah() {
+  const k = useKhatmah();
+  const last = k.history.at(-1);
+  return (
+    <div className="card card--raised text-center px-6 py-7" data-testid="khatmah-finished">
+      <div className="mx-auto w-16 h-16 rounded-full grid place-items-center btn-gold">
+        <Icon name="check" size={32} strokeWidth={2.4} />
+      </div>
+      <h2 className="text-xl font-extrabold text-foreground mt-4">{k.fullPlan ? "أتممت الختمة" : "أتممت خطة القراءة"}</h2>
+      {last && <p className="text-sm text-muted-foreground mt-1">في {shortDate(last.completedAt)}</p>}
+      <p className="text-sm text-muted-foreground mt-3">
+        {k.fullPlan
+          ? "تقبّل الله منك. يمكنك بدء ختمة جديدة متى شئت."
+          : `قرأت من ${juzLabel(k.plan!.startJuz)} إلى آخر المصحف. تُسجّل خطة قراءة مكتملة، ولا تُحسب ختمة كاملة لأنها لم تبدأ من أول المصحف.`}
+      </p>
+      <div className="grid grid-cols-2 gap-3 mt-5">
+        <Link href="/khatmah/new" className="btn btn-primary">
+          ختمة جديدة
+        </Link>
+        <button type="button" className="btn btn-soft" onClick={undoLastPortion}>
+          تراجع
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
+  const k = useKhatmah();
   const progress = useReadingProgress();
-  const stats = readingStats(progress);
+  const [, navigate] = useLocation();
 
-  const { data: surahs } = useListSurahs({
-    query: { queryKey: getListSurahsQueryKey() },
-  });
+  const continueHref = (() => {
+    if (!k.current) return "/mushaf";
+    // Resume inside the wird when the last reading position is within it.
+    const last = progress ? { surah: progress.lastSurahNumber, ayah: progress.lastVerseNumber } : null;
+    const at = last && isWithin(k.current, last) && compareAyah(last, k.current.from) > 0 ? last : k.current.from;
+    return readerHref(at, { wird: true });
+  })();
 
-  const shortSurahs = surahs?.slice(-10).reverse() ?? [];
+  const finish = () => {
+    if (!k.current) return;
+    const done = k.current.index;
+    completeCurrentPortion();
+    hapticSuccess();
+    const last = k.completed + 1 === k.total;
+    const doneText = k.fullPlan ? "أتممت الختمة، تقبّل الله منك" : "أتممت خطة القراءة، تقبّل الله منك";
+    toast.success(last ? doneText : `تم تسجيل الورد ${ar(done + 1)}`, {
+      action: { label: "تراجع", onClick: () => undoLastPortion() },
+    });
+  };
+
+  const share = () => {
+    if (!k.current) return;
+    void shareOrCopy({
+      title: "ورد اليوم",
+      text: `ورد اليوم من ${refLabel(k.current.from)} إلى ${refLabel(k.current.to)} (صفحة ${ar(k.current.fromPage)} – ${ar(k.current.toPage)})`,
+    });
+  };
 
   return (
-    <div className="page-enter max-w-2xl mx-auto px-4 py-8" dir="rtl">
-      {/* Hero */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-4 border border-primary/20">
-          <span className="font-quran text-3xl text-primary">بسم</span>
-        </div>
-        <h1 className="font-quran text-3xl font-bold text-foreground mb-2">
-          القرآن الكريم
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
-        </p>
-        <div className="gold-divider mt-6" />
-      </div>
-
-      {/* Continue Reading */}
-      {progress && progress.lastPageNumber > 1 && (
-        <Link
-          href={`/mushaf/${progress.lastSurahNumber}`}
-          className="block mb-6 p-4 rounded-xl bg-primary text-primary-foreground cursor-pointer hover:opacity-90 transition-opacity shadow-sm"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs opacity-80 mb-1">متابعة القراءة</p>
-              <p className="font-medium font-quran text-lg">{progress.lastSurahName}</p>
-              <p className="text-xs opacity-70 mt-1">صفحة {progress.lastPageNumber}</p>
+    <Screen
+      title="الورد الحالي"
+      startActions={[
+        { label: "الفواصل", icon: <Icon name="bookmark" size={24} />, onClick: () => navigate("/bookmarks"), testId: "header-bookmarks" },
+      ]}
+      endActions={
+        k.current
+          ? [{ label: "مشاركة الورد", icon: <Icon name="share" size={24} />, onClick: share, testId: "header-share" }]
+          : []
+      }
+    >
+      <div className="screen__inner px-4 pt-5 pb-8 page-enter">
+        {!k.plan && <StartKhatmah />}
+        {k.plan && k.finished && <FinishedKhatmah />}
+        {k.current && (
+          <>
+            <WirdCard portion={k.current} />
+            <div className="grid grid-cols-[1.25fr_1fr] gap-3 mt-5">
+              <Link href={continueHref} className="btn btn-primary" data-testid="continue-wird">
+                تابع قراءة الورد
+              </Link>
+              <button type="button" className="btn btn-gold whitespace-nowrap !px-3" onClick={finish} data-testid="finish-wird">
+                أتممت القراءة
+                <Icon name="check" size={20} strokeWidth={2.4} />
+              </button>
             </div>
-            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 rotate-180">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </div>
-          </div>
-        </Link>
-      )}
-
-      {/* Stats */}
-      {stats && (
-        <div className="grid grid-cols-2 gap-3 mb-8">
-          <StatCard label="الصفحات المقروءة" value={stats.pagesRead} />
-          <StatCard label="الأجزاء المكتملة" value={stats.completedJuz} />
-        </div>
-      )}
-
-      {/* Quick Nav */}
-      <div className="grid grid-cols-2 gap-3 mb-8">
-        <Link
-          href="/mushaf"
-          className="p-4 rounded-xl bg-card border border-border hover:border-primary/40 transition-colors cursor-pointer text-center"
-        >
-          <div className="text-primary mb-2">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-6 h-6 mx-auto">
-              <path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
-            </svg>
-          </div>
-          <p className="font-medium text-sm text-foreground">المصحف</p>
-        </Link>
-        <Link
-          href="/surahs"
-          className="p-4 rounded-xl bg-card border border-border hover:border-primary/40 transition-colors cursor-pointer text-center"
-        >
-          <div className="text-primary mb-2">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-6 h-6 mx-auto">
-              <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
-              <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
-            </svg>
-          </div>
-          <p className="font-medium text-sm text-foreground">السور</p>
-        </Link>
-        <Link
-          href="/search"
-          className="p-4 rounded-xl bg-card border border-border hover:border-primary/40 transition-colors cursor-pointer text-center"
-        >
-          <div className="text-primary mb-2">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-6 h-6 mx-auto">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-          </div>
-          <p className="font-medium text-sm text-foreground">البحث</p>
-        </Link>
-        <Link
-          href="/bookmarks"
-          className="p-4 rounded-xl bg-card border border-border hover:border-primary/40 transition-colors cursor-pointer text-center"
-        >
-          <div className="text-primary mb-2">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-6 h-6 mx-auto">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
-            </svg>
-          </div>
-          <p className="font-medium text-sm text-foreground">العلامات</p>
-        </Link>
+          </>
+        )}
+        {k.plan && <ProgressBlock />}
+        <ContinueReading />
       </div>
-
-      {/* Short Surahs */}
-      {shortSurahs.length > 0 && (
-        <div>
-          <h2 className="font-medium text-sm text-muted-foreground mb-3">قصار السور</h2>
-          <div className="bg-card rounded-xl border border-border overflow-hidden">
-            {shortSurahs.map((s, i) => (
-              <div key={s.id}>
-                <QuickSurah number={s.number} name={s.name} versesCount={s.versesCount} />
-                {i < shortSurahs.length - 1 && <div className="h-px bg-border mx-4" />}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    </Screen>
   );
 }

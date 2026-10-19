@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="fonts.css">
+<style>
+body{margin:0;background:#EFE9DA;font-family:Cairo;width:1600px;padding:36px;box-sizing:border-box;color:#0B3D2A}
+h1{font:700 34px Cairo;margin:0}
+h2{font:700 20px Cairo;margin:0 0 12px;color:#145A3E}
+.grid{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:24px;margin-top:20px}
+.p{background:#fff;border-radius:22px;padding:22px;box-shadow:0 6px 24px rgba(0,0,0,.07)}
+.dark{background:radial-gradient(circle at 50% 30%,#145A3E,#0B3D2A 65%,#062A1C);color:#F6F0E1}
+.ivory{background:#F6F0E1}
+.lock{display:flex;align-items:center;gap:18px;justify-content:center}
+.wm{font:700 72px Messiri;line-height:1.05}
+.tag{font:600 19px Cairo;text-align:center;opacity:.85}
+.sq{border-radius:22.37%}
+.sh{box-shadow:0 10px 26px rgba(0,0,0,.28)}
+.sizes{display:flex;gap:16px;align-items:flex-end}
+.sw{display:flex;gap:10px;flex-wrap:wrap}
+.sw div{width:112px;border-radius:14px;overflow:hidden;font:600 12px Cairo;background:#fff;border:1px solid #e3dccb}
+.sw i{display:block;height:58px}
+.sw span{display:block;padding:6px 8px;direction:ltr;text-align:left}
+.bar{height:64px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(#145A3E,#0B3D2A)}
+</style><script src="symbols.js"></script></head><body dir="rtl">
+<h1>مصحفك · الاتجاه النهائي للشعار (المفهوم B المنقّح)</h1>
+<div class="grid">
+  <div class="p dark"><h2 style="color:#F1D894">الأيقونة والشعار على خلفية داكنة</h2>
+    <div class="lock" style="height:300px"><span id="d1"></span><div><div class="wm" style="color:#D6AE5C">مصحفك</div><div class="tag">مصحفك معك</div></div></div></div>
+  <div class="p ivory"><h2>على خلفية فاتحة</h2>
+    <div class="lock" style="height:300px"><span id="l1"></span><div><div class="wm" style="color:#0B3D2A">مصحفك</div><div class="tag" style="color:#A97C2F">مصحفك معك</div></div></div></div>
+  <div class="p dark" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px"><h2 style="color:#F1D894;align-self:stretch">شاشة البداية (تكديس عمودي)</h2>
+    <span id="d2"></span><div class="wm" style="color:#D6AE5C;font-size:60px">مصحفك</div><div class="tag">مصحفك معك</div></div>
+  <div class="p"><h2>المقاسات الصغيرة</h2><div class="sizes" id="sz"></div>
+    <h2 style="margin-top:22px">شريط التطبيق</h2><div class="bar"><span id="hb"></span><span style="font:700 26px Messiri;color:#F6F0E1">مصحفك</span></div></div>
+  <div class="p"><h2>الألوان</h2><div class="sw">
+    <div><i style="background:#0B3D2A"></i><span>Green 900 #0B3D2A</span></div>
+    <div><i style="background:#145A3E"></i><span>Green 700 #145A3E</span></div>
+    <div><i style="background:#062A1C"></i><span>Green 950 #062A1C</span></div>
+    <div><i style="background:#D6AE5C"></i><span>Gold 500 #D6AE5C</span></div>
+    <div><i style="background:#F1D894"></i><span>Gold 200 #F1D894</span></div>
+    <div><i style="background:#A97C2F"></i><span>Gold 700 #A97C2F</span></div>
+    <div><i style="background:#F6F0E1"></i><span>Ivory #F6F0E1</span></div>
+  </div></div>
+  <div class="p"><h2>الخطوط</h2>
+    <div style="font:700 54px Messiri">مصحفك</div><div style="font:600 14px Cairo;opacity:.7;direction:ltr;text-align:left">Wordmark: El Messiri Bold (OFL)</div>
+    <div style="font:600 24px Cairo;margin-top:12px">مصحفك معك · القرآن الكريم والأذكار</div><div style="font:600 14px Cairo;opacity:.7;direction:ltr;text-align:left">Tagline and UI: Cairo (OFL) · Quran text: Amiri Quran (OFL)</div></div>
+</div>
+<script>
+const ic=(s,o)=>appIcon(s,o).replace("<svg",`<svg class="sq sh"`);
+d1.innerHTML=ic(170);l1.innerHTML=ic(170,{light:true});d2.innerHTML=ic(150);
+sz.innerHTML=[120,80,60,40,29].map(s=>ic(s)).join("");
+hb.innerHTML=`<svg width="34" height="34" viewBox="0 0 100 100">${defs}${mushafSymbol({lines:false})}</svg>`;
+</script></body></html>
