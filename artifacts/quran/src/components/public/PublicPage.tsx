@@ -28,7 +28,7 @@ export function TextLink({ href, children, testId, external }: { href: string; c
 /** The support address as an inline mailto link. */
 export function EmailLink({ email, subject, testId }: { email: string; subject: string; testId?: string }) {
   return (
-    <a href={mailtoHref(email, subject)} dir="ltr" className={`${LINK} break-all`} data-testid={testId}>
+    <a href={mailtoHref(email, subject)} dir="ltr" className={`${LINK} whitespace-nowrap`} data-testid={testId}>
       {email}
     </a>
   );

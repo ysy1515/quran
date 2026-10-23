@@ -89,7 +89,7 @@ export default function Support({ supportEmail = APP_CONFIG.supportEmail }: { su
           <li>وصف مختصر للمشكلة، والشاشة التي ظهرت فيها.</li>
           <li>الخطوات التي أدّت إليها، وهل تتكرر في كل مرة.</li>
           <li>
-            طراز الجهاز وإصدار نظام التشغيل، مثل: <bdi dir="ltr">iPhone 15, iOS 18</bdi>.
+            طراز الجهاز وإصدار نظام التشغيل، مثل: <bdi dir="ltr" className="whitespace-nowrap">iPhone 15, iOS 18</bdi>.
           </li>
           <li>لقطة شاشة إن أمكن.</li>
         </ol>

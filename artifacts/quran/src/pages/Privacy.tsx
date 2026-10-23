@@ -65,8 +65,16 @@ export default function Privacy({
 
       <Section id="operator" title="الجهة المسؤولة والتواصل">
         <p>
-          {operatorName ? <>يقدّم تطبيق مصحفك وموقعه <span data-testid="operator-name">{operatorName}</span>. </> : null}
-          الموقع الرسمي للتطبيق هو <bdi dir="ltr">quran.yahya.app</bdi>.
+          {operatorName ? (
+            <>
+              المسؤول عن تطبيق مصحفك وموقعه <bdi dir="ltr">quran.yahya.app</bdi> وعن البيانات الموضحة في هذه السياسة هو{" "}
+              <span data-testid="operator-name">{operatorName}</span>.
+            </>
+          ) : (
+            <>
+              الموقع الرسمي للتطبيق هو <bdi dir="ltr">quran.yahya.app</bdi>.
+            </>
+          )}
         </p>
         {supportEmail && (
           <p>
