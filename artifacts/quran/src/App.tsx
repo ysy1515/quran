@@ -22,6 +22,7 @@ import Athkar from "@/pages/Athkar";
 import AthkarCategory from "@/pages/AthkarCategory";
 import TafsirPage from "@/pages/TafsirPage";
 import Support from "@/pages/Support";
+import Privacy from "@/pages/Privacy";
 import AppShell from "@/components/shell/AppShell";
 import AppEffects from "@/components/AppEffects";
 import SplashScreen from "@/components/SplashScreen";
@@ -73,15 +74,15 @@ interface AppProps {
   onMounted?: () => void;
 }
 
-// The public support page (App Store Support URL) is a plain web page: no splash.
-function isSupportPath(): boolean {
+// The public support and privacy pages (App Store URLs) are plain web pages: no splash.
+function isPublicPagePath(): boolean {
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-  return /^\/support\/?$/.test(window.location.pathname.slice(base.length));
+  return /^\/(support|privacy)\/?$/.test(window.location.pathname.slice(base.length));
 }
 
 function App({ onMounted }: AppProps) {
   const [showSplash, setShowSplash] = useState<boolean>(() => {
-    if (isSupportPath()) return false;
+    if (isPublicPagePath()) return false;
     try {
       if (sessionStorage.getItem("splash-shown")) return false;
       sessionStorage.setItem("splash-shown", "1");
@@ -103,6 +104,9 @@ function App({ onMounted }: AppProps) {
           <Switch>
             <Route path="/support">
               <Support />
+            </Route>
+            <Route path="/privacy">
+              <Privacy />
             </Route>
             <Route>
               <AppEffects />

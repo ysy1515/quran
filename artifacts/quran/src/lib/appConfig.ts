@@ -2,10 +2,18 @@ export const APP_CONFIG = {
   website: "https://quran.yahya.app",
   iosAppStoreUrl: "",
   androidPlayStoreUrl: "",
-  /** Public support address shown on /support (the App Store Support URL). */
+  /**
+   * Public support address, shown as a mailto link on /support and /privacy.
+   * Must be a real inbox the operator reads; the contact sections stay hidden while it is empty.
+   */
   supportEmail: "",
-  /** Public privacy policy page, linked from /support once it exists. */
-  privacyPolicyUrl: "",
+  /** Who runs the app, named in the privacy policy (the App Store seller name). Hidden while empty. */
+  operatorName: "",
+  /** App Store Connect "Support URL" and "Privacy Policy URL". Both pages are served by this web app. */
+  supportUrl: "https://quran.yahya.app/support",
+  privacyPolicyUrl: "https://quran.yahya.app/privacy",
+  /** Date shown as the privacy policy's last update. Change it whenever the policy text changes. */
+  privacyPolicyUpdated: "2026-10-23",
   shareTitle: "مصحفك",
   shareText: "مصحفك معك: القرآن الكريم والأذكار ومواقيت الصلاة. حمّل تطبيق مصحفك",
 };

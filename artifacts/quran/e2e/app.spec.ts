@@ -257,40 +257,100 @@ test.describe("prayer", () => {
   });
 });
 
-test.describe("support page", () => {
-  for (const path of ["/support", "/support/"]) {
-    test(`${path} opens directly as a public page, without the app shell or splash`, async ({ page }) => {
-      await mockApi(page);
-      await page.goto(path);
-      await expect(page).toHaveTitle("الدعم والمساعدة – مصحفك");
-      const support = page.getByTestId("support-page");
-      await expect(support.getByRole("heading", { level: 1 })).toHaveText("الدعم والمساعدة – مصحفك");
-      await expect(support).toContainText("مصحفك معك");
-      for (const title of ["عن مصحفك", "الإبلاغ عن مشكلة", "الأسئلة الشائعة", "الخصوصية"]) {
-        await expect(support.getByRole("heading", { level: 2, name: title })).toBeVisible();
+const PUBLIC_PAGES = [
+  {
+    path: "/support",
+    testId: "support-page",
+    title: "الدعم والمساعدة – مصحفك",
+    sections: ["عن مصحفك", "الإبلاغ عن مشكلة", "الأسئلة الشائعة", "الخصوصية"],
+  },
+  {
+    path: "/privacy",
+    testId: "privacy-page",
+    title: "سياسة الخصوصية – مصحفك",
+    sections: [
+      "الجهة المسؤولة والتواصل",
+      "البيانات المحفوظة على جهازك",
+      "الموقع ومواقيت الصلاة",
+      "خدمات القرآن الكريم والبحث",
+      "الإشعارات",
+      "الاستضافة وسجلات الخادم",
+      "مزوّدو الخدمات من أطراف أخرى",
+      "الاحتفاظ بالبيانات وحذفها",
+      "خياراتك وحقوقك",
+      "تحديث هذه السياسة",
+    ],
+  },
+];
+
+test.describe("public pages", () => {
+  for (const pg of PUBLIC_PAGES) {
+    for (const path of [pg.path, `${pg.path}/`]) {
+      for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 }]) {
+        test(`${path} at ${viewport.width}px opens directly, without the app shell or splash`, async ({ page }) => {
+          await page.setViewportSize(viewport);
+          await mockApi(page);
+          const res = await page.goto(path);
+          expect(res?.status()).toBe(200);
+          await expect(page).toHaveTitle(pg.title);
+          const root = page.getByTestId(pg.testId);
+          await expect(root.getByRole("heading", { level: 1 })).toHaveText(pg.title);
+          await expect(root).toContainText("مصحفك معك");
+          for (const title of pg.sections) {
+            await expect(root.getByRole("heading", { level: 2, name: title })).toBeVisible();
+          }
+          await expect(page.getByTestId("tabbar")).toHaveCount(0);
+          // No splash covers the page: what sits on top in the middle of the screen is the page itself.
+          expect(await page.evaluate((id) => !!document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest(`[data-testid=${id}]`), pg.testId)).toBe(true);
+          expect(await root.evaluate((el) => getComputedStyle(el).direction)).toBe("rtl");
+          // Long content scrolls inside the page and nothing overflows sideways.
+          expect(await root.evaluate((el) => el.scrollHeight > el.clientHeight && el.scrollWidth <= el.clientWidth)).toBe(true);
+          // No leftover placeholder text.
+          expect(await root.innerText()).not.toMatch(/example\.com|placeholder|TODO|lorem|XXX/i);
+        });
       }
-      await expect(page.getByTestId("tabbar")).toHaveCount(0);
-      // No splash covers the page: what sits on top in the middle of the screen is the support page.
-      expect(await page.evaluate(() => !!document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest("[data-testid=support-page]"))).toBe(true);
-      expect(await support.evaluate((el) => getComputedStyle(el).direction)).toBe("rtl");
-      // Long content scrolls inside the page and nothing overflows sideways.
-      expect(await support.evaluate((el) => el.scrollHeight > el.clientHeight && el.scrollWidth <= el.clientWidth)).toBe(true);
-    });
+    }
   }
 
-  test("FAQ answers open, and the contact email is a working mailto link when configured", async ({ page }) => {
+  test("support and privacy link to each other", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/support");
+    await page.getByTestId("privacy-link").click();
+    await expect(page).toHaveURL(/\/privacy$/);
+    await expect(page.getByTestId("privacy-page")).toBeVisible();
+    await page.getByTestId("support-link").click();
+    await expect(page).toHaveURL(/\/support$/);
+    await page.getByTestId("footer-privacy-link").click();
+    await expect(page).toHaveURL(/\/privacy$/);
+    await page.getByTestId("footer-support-link").click();
+    await expect(page).toHaveURL(/\/support$/);
+  });
+
+  test("FAQ answers open, and every support email is a working mailto link when configured", async ({ page }) => {
     await mockApi(page);
     await page.goto("/support");
     const faq = page.locator("#faq details");
     await expect(faq).toHaveCount(6);
     await faq.first().locator("summary").click();
     await expect(faq.first()).toHaveAttribute("open", "");
-    const email = page.getByTestId("support-email");
-    if (APP_CONFIG.supportEmail) {
-      await expect(email).toHaveAttribute("href", new RegExp(`^mailto:${APP_CONFIG.supportEmail.replace(/[.+]/g, "\\$&")}`));
-      await expect(email).toContainText(APP_CONFIG.supportEmail);
-    } else {
-      await expect(email).toHaveCount(0);
+    const email = APP_CONFIG.supportEmail;
+    const links = [["/support", "support-email"], ["/support", "report-email"], ["/privacy", "privacy-email"]] as const;
+    for (const [path, testId] of links) {
+      await page.goto(path);
+      const link = page.getByTestId(testId);
+      if (email) {
+        await expect(link).toHaveAttribute("href", new RegExp(`^mailto:${email.replace(/[.+]/g, "\\$&")}\\?subject=`));
+        await expect(link).toContainText(email);
+      } else {
+        await expect(link).toHaveCount(0);
+      }
     }
+  });
+
+  test("the privacy policy shows its update date and the configured operator", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/privacy");
+    await expect(page.getByTestId("privacy-updated")).toContainText("آخر تحديث");
+    await expect(page.getByTestId("operator-name")).toHaveCount(APP_CONFIG.operatorName ? 1 : 0);
   });
 });
