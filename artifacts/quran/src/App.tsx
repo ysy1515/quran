@@ -21,6 +21,7 @@ import AdhanSettings from "@/pages/AdhanSettings";
 import Athkar from "@/pages/Athkar";
 import AthkarCategory from "@/pages/AthkarCategory";
 import TafsirPage from "@/pages/TafsirPage";
+import Support from "@/pages/Support";
 import AppShell from "@/components/shell/AppShell";
 import AppEffects from "@/components/AppEffects";
 import SplashScreen from "@/components/SplashScreen";
@@ -72,8 +73,15 @@ interface AppProps {
   onMounted?: () => void;
 }
 
+// The public support page (App Store Support URL) is a plain web page: no splash.
+function isSupportPath(): boolean {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  return /^\/support\/?$/.test(window.location.pathname.slice(base.length));
+}
+
 function App({ onMounted }: AppProps) {
   const [showSplash, setShowSplash] = useState<boolean>(() => {
+    if (isSupportPath()) return false;
     try {
       if (sessionStorage.getItem("splash-shown")) return false;
       sessionStorage.setItem("splash-shown", "1");
@@ -92,8 +100,15 @@ function App({ onMounted }: AppProps) {
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
         {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AppEffects />
-          <Router />
+          <Switch>
+            <Route path="/support">
+              <Support />
+            </Route>
+            <Route>
+              <AppEffects />
+              <Router />
+            </Route>
+          </Switch>
           <Toaster position="top-center" richColors />
         </WouterRouter>
       </ThemeProvider>

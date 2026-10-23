@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mockApi } from "./mockApi";
+import { APP_CONFIG } from "../src/lib/appConfig";
 
 const TABS = [
   { path: "/", label: "ورد اليوم" },
@@ -253,5 +254,43 @@ test.describe("prayer", () => {
     await expect(page.locator('[aria-current="time"]')).toHaveCount(1);
     await page.getByTestId("next-day").click();
     await expect(page.locator('[aria-current="time"]')).toHaveCount(0);
+  });
+});
+
+test.describe("support page", () => {
+  for (const path of ["/support", "/support/"]) {
+    test(`${path} opens directly as a public page, without the app shell or splash`, async ({ page }) => {
+      await mockApi(page);
+      await page.goto(path);
+      await expect(page).toHaveTitle("الدعم والمساعدة – مصحفك");
+      const support = page.getByTestId("support-page");
+      await expect(support.getByRole("heading", { level: 1 })).toHaveText("الدعم والمساعدة – مصحفك");
+      await expect(support).toContainText("مصحفك معك");
+      for (const title of ["عن مصحفك", "الإبلاغ عن مشكلة", "الأسئلة الشائعة", "الخصوصية"]) {
+        await expect(support.getByRole("heading", { level: 2, name: title })).toBeVisible();
+      }
+      await expect(page.getByTestId("tabbar")).toHaveCount(0);
+      // No splash covers the page: what sits on top in the middle of the screen is the support page.
+      expect(await page.evaluate(() => !!document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest("[data-testid=support-page]"))).toBe(true);
+      expect(await support.evaluate((el) => getComputedStyle(el).direction)).toBe("rtl");
+      // Long content scrolls inside the page and nothing overflows sideways.
+      expect(await support.evaluate((el) => el.scrollHeight > el.clientHeight && el.scrollWidth <= el.clientWidth)).toBe(true);
+    });
+  }
+
+  test("FAQ answers open, and the contact email is a working mailto link when configured", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/support");
+    const faq = page.locator("#faq details");
+    await expect(faq).toHaveCount(6);
+    await faq.first().locator("summary").click();
+    await expect(faq.first()).toHaveAttribute("open", "");
+    const email = page.getByTestId("support-email");
+    if (APP_CONFIG.supportEmail) {
+      await expect(email).toHaveAttribute("href", new RegExp(`^mailto:${APP_CONFIG.supportEmail.replace(/[.+]/g, "\\$&")}`));
+      await expect(email).toContainText(APP_CONFIG.supportEmail);
+    } else {
+      await expect(email).toHaveCount(0);
+    }
   });
 });
