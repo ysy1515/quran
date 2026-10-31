@@ -126,7 +126,7 @@ workflows:
 
           cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
 
-          APP_VERSION="1.0.4"
+          APP_VERSION="1.0.5"
 
           # CM_BUILD_NUMBER is not one of Codemagic's built-in variables, so the
           # previous fallback could produce 12 on every build. Use the next number
@@ -322,7 +322,7 @@ workflows:
 
           cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
 
-          APP_VERSION="1.0.4"
+          APP_VERSION="1.0.5"
 
           # CM_BUILD_NUMBER is not one of Codemagic's built-in variables, so the
           # previous fallback could produce 12 on every build. Use the next number
