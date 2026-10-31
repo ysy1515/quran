@@ -1,4 +1,4 @@
-import { createLocalStore, useLocalStore } from "./localStore";
+import { createLocalStore, durableWritesSettled, useLocalStore } from "./localStore";
 import { isCapacitorNative } from "./appConfig";
 import { ANDROID_REMINDERS_CHANNEL } from "./muezzins";
 
@@ -79,21 +79,33 @@ export async function requestReminderPermission(): Promise<boolean> {
   }
 }
 
-/** Cancel and re-create the daily reminders from the saved settings. */
-export async function syncReminders(r: Reminders = remindersStore.get()): Promise<void> {
-  if (!isCapacitorNative()) return;
+export type ReminderResult = "ok" | "denied" | "unsupported" | "error";
+let queue: Promise<unknown> = Promise.resolve();
+
+function enqueue<T>(work: () => Promise<T>): Promise<T> {
+  const run = queue.then(work);
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+/** Read saved settings inside the queue so a resume cannot restore stale alerts. */
+export function syncReminders(): Promise<ReminderResult> {
+  return enqueue(() => scheduleReminders(remindersStore.get()));
+}
+
+async function scheduleReminders(r: Reminders): Promise<ReminderResult> {
+  if (!isCapacitorNative()) return "unsupported";
   try {
     const ln = await plugin();
+    if (REMINDER_IDS.some((id) => r[id].on) && (await ln.checkPermissions()).display !== "granted") return "denied";
     const pending = await ln.getPending();
-    const ours = pending.notifications.filter((n) => n.id >= ID_BASE && n.id < ID_BASE + 100);
-    if (ours.length) await ln.cancel({ notifications: ours.map((n) => ({ id: n.id })) });
     const notifications = REMINDER_IDS.filter((id) => r[id].on).map((id) => {
       const [hour, minute] = r[id].time.split(":").map(Number) as [number, number];
       return {
         id: NOTIF_ID[id],
         title: REMINDER_TEXT[id].title,
         body: REMINDER_TEXT[id].body,
-        schedule: { on: { hour, minute }, allowWhileIdle: true },
+        schedule: { on: { hour, minute }, repeats: true, allowWhileIdle: true },
         // iOS plays no sound unless one is named; "default" is the system notification sound.
         // Android 8+ takes the sound from the channel (created in MainActivity.java).
         sound: "default",
@@ -104,18 +116,36 @@ export async function syncReminders(r: Reminders = remindersStore.get()): Promis
       };
     });
     if (notifications.length) await ln.schedule({ notifications });
+    const wanted = new Set(notifications.map((n) => n.id));
+    const obsolete = pending.notifications.filter((n) => n.id >= ID_BASE && n.id < ID_BASE + 100 && !wanted.has(n.id));
+    if (obsolete.length) await ln.cancel({ notifications: obsolete.map((n) => ({ id: n.id })) });
+    return "ok";
   } catch (err) {
     console.warn("[Reminders] schedule failed:", err);
+    return "error";
   }
 }
 
-export async function setReminder(id: ReminderId, patch: Partial<Reminder>): Promise<"ok" | "denied" | "unsupported"> {
-  if (!isCapacitorNative()) return "unsupported";
-  if (patch.on) {
-    const granted = await requestReminderPermission();
-    if (!granted) return "denied";
-  }
-  remindersStore.update((r) => ({ ...r, [id]: { ...r[id], ...patch } }));
-  await syncReminders();
-  return "ok";
+export function setReminder(id: ReminderId, patch: Partial<Reminder>): Promise<ReminderResult> {
+  return enqueue(async () => {
+    if (!isCapacitorNative()) return "unsupported";
+    if (patch.time !== undefined && !TIME_RE.test(patch.time)) return "error";
+    if (patch.on && !(await requestReminderPermission())) return "denied";
+    const previous = remindersStore.get();
+    const next = { ...previous, [id]: { ...previous[id], ...patch } };
+    if (!next[id].on) {
+      // Turning a reminder off must also work after OS permission is revoked.
+      try {
+        await (await plugin()).cancel({ notifications: [{ id: NOTIF_ID[id] }] });
+      } catch {
+        return "error";
+      }
+    } else {
+      const result = await scheduleReminders(next);
+      if (result !== "ok") return result;
+    }
+    remindersStore.set(next);
+    await durableWritesSettled();
+    return "ok";
+  });
 }

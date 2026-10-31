@@ -10,6 +10,37 @@ const TABS = [
   { path: "/more", label: "المزيد" },
 ];
 
+test("enables adhan on the first click after acquiring location and persists across reload", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.geolocation, "getCurrentPosition", {
+      value: (success: PositionCallback) => success({ coords: { latitude: 18.3, longitude: 42.7333 } } as GeolocationPosition),
+    });
+    Object.defineProperty(Notification, "requestPermission", { value: async () => "granted" });
+  });
+  await open(page, "/adhan/settings");
+  const toggle = page.getByTestId("adhan-enabled");
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await toggle.click();
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+});
+
+test("does not enable adhan when location is refused", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.geolocation, "getCurrentPosition", {
+      value: (_success: PositionCallback, error: PositionErrorCallback) => error({ code: 1 } as GeolocationPositionError),
+    });
+  });
+  await open(page, "/adhan/settings");
+  await page.getByTestId("adhan-enabled").click();
+  await expect(page.getByText("تم رفض الوصول إلى الموقع، يمكنك السماح من الإعدادات أو اختيار مدينتك")).toBeVisible();
+  await expect(page.getByTestId("adhan-enabled")).toHaveAttribute("aria-checked", "false");
+});
+
 async function open(page: Page, path: string, storage: Record<string, unknown> = {}) {
   await page.addInitScript((seed) => {
     sessionStorage.setItem("splash-shown", "1");

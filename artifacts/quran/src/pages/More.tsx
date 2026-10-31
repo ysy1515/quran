@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { toast } from "sonner";
 import Screen from "@/components/shell/Screen";
 import { BrandLockup } from "@/components/brand/Brand";
@@ -24,11 +25,18 @@ function ReminderRow({ id, label, hint }: { id: ReminderId; label: string; hint?
   const reminders = useReminders();
   const r = reminders[id];
   const supported = remindersSupported();
+  const [saving, setSaving] = useState(false);
 
   const apply = async (patch: { on?: boolean; time?: string }) => {
-    const res = await setReminder(id, patch);
-    if (res === "denied") toast.error("لم يتم منح إذن الإشعارات، يرجى السماح من إعدادات الجهاز");
-    else if (res === "ok" && patch.on) toast.success(`سيصلك تذكير ${REMINDER_TEXT[id].title} يوميًا`);
+    setSaving(true);
+    try {
+      const res = await setReminder(id, patch);
+      if (res === "denied") toast.error("لم يتم منح إذن الإشعارات، يرجى السماح من إعدادات الجهاز");
+      else if (res === "error") toast.error("تعذّر حفظ التذكير، حاول مرة أخرى");
+      else if (res === "ok" && patch.on) toast.success(`سيصلك تذكير ${REMINDER_TEXT[id].title} يوميًا`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -40,6 +48,7 @@ function ReminderRow({ id, label, hint }: { id: ReminderId; label: string; hint?
       {r.on && supported && (
         <input
           type="time"
+          disabled={saving}
           value={r.time}
           onChange={(e) => e.target.value && void apply({ time: e.target.value })}
           className="time-value"
@@ -47,7 +56,7 @@ function ReminderRow({ id, label, hint }: { id: ReminderId; label: string; hint?
           dir="ltr"
         />
       )}
-      <Switch checked={r.on && supported} onChange={(v) => void apply({ on: v })} label={label} disabled={!supported} />
+      <Switch checked={r.on && supported} onChange={(v) => void apply({ on: v })} label={label} disabled={!supported || saving} />
     </div>
   );
 }
@@ -61,7 +70,7 @@ export default function More() {
   const dhikr = useDhikrState();
   const supported = remindersSupported();
   const { fullCount, partialCount, lastFull } = k.stats;
-  const webNote = supported ? undefined : "التذكيرات اليومية متاحة في تطبيق الآيفون.";
+  const webNote = supported ? undefined : "التذكيرات اليومية متاحة في تطبيق الآيفون وأندرويد.";
 
   return (
     <Screen title="المزيد">

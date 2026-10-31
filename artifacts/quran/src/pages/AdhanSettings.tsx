@@ -118,9 +118,11 @@ export default function AdhanSettings() {
     try {
       await requestLocation();
       toast.success("تم تحديد الموقع");
+      return true;
     } catch (err) {
       const denied = (err as GeolocationPositionError)?.code === 1;
       toast.error(denied ? "تم رفض الوصول إلى الموقع، يمكنك السماح من الإعدادات أو اختيار مدينتك" : "تعذّر تحديد الموقع، يمكنك اختيار مدينتك من القائمة");
+      return false;
     } finally {
       setLocLoading(false);
     }
@@ -133,10 +135,7 @@ export default function AdhanSettings() {
       toast("تم إيقاف تنبيهات الأذان");
       return;
     }
-    if (!coords) {
-      await locate();
-      return;
-    }
+    if (!coords && !(await locate())) return;
     if (!(await requestPermission())) {
       toast.error("لم يتم منح إذن الإشعارات، يرجى السماح من إعدادات الجهاز");
       return;
