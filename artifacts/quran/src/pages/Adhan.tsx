@@ -17,6 +17,8 @@ import {
   type PrayerTime,
 } from "@/lib/prayer";
 import { clock, gregorianLabel, hijriLabel, sameDay } from "@/lib/format";
+import { isCapacitorNative } from "@/lib/appConfig";
+import { stopAdhan, useAdhanPlayer } from "@/lib/adhanPlayer";
 
 function useNow(intervalMs: number) {
   const [now, setNow] = useState(() => new Date());
@@ -62,6 +64,7 @@ export default function Adhan() {
   const [locLoading, setLocLoading] = useState(false);
   const { requestPermission } = useLocalNotifications();
   const announced = useRef<string>("");
+  const player = useAdhanPlayer();
 
   // Refresh the place name once if we have coordinates but no saved name.
   useEffect(() => {
@@ -87,6 +90,8 @@ export default function Adhan() {
   const snoozed = isSnoozed(prefs.snoozedUntil);
 
   // While this screen is open, announce the adhan in-app at prayer time (as before).
+  // In the native app the scheduled local notification is the alert (with its
+  // sound), so only the toast is shown here; a browser notification would duplicate it.
   useEffect(() => {
     if (!coords || !prefs.enabled || snoozed) return;
     for (const t of prayerTimesFor(coords, now, prefs)) {
@@ -95,7 +100,7 @@ export default function Adhan() {
       const key = `${t.key}-${t.time.toDateString()}`;
       if (diff >= 0 && diff < 60000 && announced.current !== key) {
         announced.current = key;
-        if ("Notification" in window && Notification.permission === "granted") {
+        if (!isCapacitorNative() && "Notification" in window && Notification.permission === "granted") {
           new Notification(`حان وقت ${t.label}`, { body: "حيَّ على الصلاة • حيَّ على الفلاح", silent: false });
         }
         toast.success(`حان وقت ${t.label}`, { duration: 8000 });
@@ -207,6 +212,18 @@ export default function Adhan() {
       }
     >
       <div className="screen__inner">
+        {player.playing && (
+          <button
+            type="button"
+            onClick={stopAdhan}
+            className="w-full flex items-center gap-3 px-5 py-3 bg-primary/10 text-primary dark:text-gold font-bold text-sm text-right"
+            data-testid="adhan-playing"
+          >
+            <Icon name="bell" size={20} />
+            <span className="flex-1">يُرفع الأذان الآن</span>
+            <span className="underline">إيقاف</span>
+          </button>
+        )}
         {snoozed && prefs.enabled && (
           <button
             type="button"

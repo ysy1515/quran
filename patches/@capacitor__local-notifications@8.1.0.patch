@@ -1,0 +1,45 @@
+diff --git a/android/src/main/java/com/capacitorjs/plugins/localnotifications/LocalNotificationRestoreReceiver.java b/android/src/main/java/com/capacitorjs/plugins/localnotifications/LocalNotificationRestoreReceiver.java
+index 8e0390f082a3246999640ccb702a5e059f92b276..04a5a4c1f295925918274288fcc31a4d869d5386 100644
+--- a/android/src/main/java/com/capacitorjs/plugins/localnotifications/LocalNotificationRestoreReceiver.java
++++ b/android/src/main/java/com/capacitorjs/plugins/localnotifications/LocalNotificationRestoreReceiver.java
+@@ -11,6 +11,8 @@ import java.util.List;
+ 
+ public class LocalNotificationRestoreReceiver extends BroadcastReceiver {
+ 
++    private static final long STALE_AFTER_MS = 10 * 60 * 1000;
++
+     @Override
+     public void onReceive(Context context, Intent intent) {
+         UserManager um = context.getSystemService(UserManager.class);
+@@ -31,6 +33,13 @@ public class LocalNotificationRestoreReceiver extends BroadcastReceiver {
+             if (schedule != null) {
+                 Date at = schedule.getAt();
+                 if (at != null && at.before(new Date())) {
++                    // Mushafak patch: a time-bound alert (such as a prayer time) that was due while
++                    // the device was off is only shown if it is at most 10 minutes late; older
++                    // ones are dropped instead of all firing together after boot.
++                    if (new Date().getTime() - at.getTime() > STALE_AFTER_MS) {
++                        storage.deleteNotification(id);
++                        continue;
++                    }
+                     // modify the scheduled date in order to show notifications that would have been delivered while device was off.
+                     long newDateTime = new Date().getTime() + 15 * 1000;
+                     schedule.setAt(new Date(newDateTime));
+diff --git a/android/src/main/java/com/capacitorjs/plugins/localnotifications/TimedNotificationPublisher.java b/android/src/main/java/com/capacitorjs/plugins/localnotifications/TimedNotificationPublisher.java
+index 0a5c0add0e7cc3416cce47725de4f9355e3c77ca..8735ee3a2c6a6b53ce0715c4c9f357ad39af1f37 100644
+--- a/android/src/main/java/com/capacitorjs/plugins/localnotifications/TimedNotificationPublisher.java
++++ b/android/src/main/java/com/capacitorjs/plugins/localnotifications/TimedNotificationPublisher.java
+@@ -76,9 +76,11 @@ public class TimedNotificationPublisher extends BroadcastReceiver {
+                     "Capacitor/LocalNotification",
+                     "Exact alarms not allowed in user settings.  Notification scheduled with non-exact alarm."
+                 );
+-                alarmManager.set(AlarmManager.RTC, trigger, pendingIntent);
++                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pendingIntent);
+             } else {
+-                alarmManager.setExact(AlarmManager.RTC, trigger, pendingIntent);
++                // Mushafak patch: repeating reminders were re-armed with a plain RTC alarm,
++                // which Doze defers; keep them allowed while idle like the first occurrence.
++                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pendingIntent);
+             }
+             SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+             Logger.debug(Logger.tags("LN"), "notification " + id + " will next fire at " + sdf.format(new Date(trigger)));

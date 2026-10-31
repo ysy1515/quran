@@ -17,9 +17,10 @@ const config: CapacitorConfig = {
       spinnerColor: "#a3e4c1",
     },
     LocalNotifications: {
-      smallIcon: "ic_stat_icon_config_sample",
+      // Android status-bar icon (res/drawable/ic_stat_mushafak.xml). Sounds are set per
+      // notification (iOS) and per channel (Android 8+, channels created in MainActivity.java).
+      smallIcon: "ic_stat_mushafak",
       iconColor: "#1a4731",
-      sound: "default",
     },
   },
   android: {

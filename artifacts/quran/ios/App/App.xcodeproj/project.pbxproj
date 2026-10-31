@@ -15,6 +15,11 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		A7DA4A012F00000100AD4A01 /* adhan_1.caf in Resources */ = {isa = PBXBuildFile; fileRef = A7DA4A012F00000200AD4A01 /* adhan_1.caf */; };
+		A7DA4A022F00000100AD4A01 /* adhan_2.caf in Resources */ = {isa = PBXBuildFile; fileRef = A7DA4A022F00000200AD4A01 /* adhan_2.caf */; };
+		A7DA4A032F00000100AD4A01 /* adhan_3.caf in Resources */ = {isa = PBXBuildFile; fileRef = A7DA4A032F00000200AD4A01 /* adhan_3.caf */; };
+		A7DA4A042F00000100AD4A01 /* adhan_4.caf in Resources */ = {isa = PBXBuildFile; fileRef = A7DA4A042F00000200AD4A01 /* adhan_4.caf */; };
+		A7DA4A052F00000100AD4A01 /* adhan_5.caf in Resources */ = {isa = PBXBuildFile; fileRef = A7DA4A052F00000200AD4A01 /* adhan_5.caf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +33,11 @@
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		A7DA4A012F00000200AD4A01 /* adhan_1.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = adhan_1.caf; sourceTree = "<group>"; };
+		A7DA4A022F00000200AD4A01 /* adhan_2.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = adhan_2.caf; sourceTree = "<group>"; };
+		A7DA4A032F00000200AD4A01 /* adhan_3.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = adhan_3.caf; sourceTree = "<group>"; };
+		A7DA4A042F00000200AD4A01 /* adhan_4.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = adhan_4.caf; sourceTree = "<group>"; };
+		A7DA4A052F00000200AD4A01 /* adhan_5.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = adhan_5.caf; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,8 +80,21 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				A7DA4A002F00000300AD4A01 /* Sounds */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		A7DA4A002F00000300AD4A01 /* Sounds */ = {
+			isa = PBXGroup;
+			children = (
+				A7DA4A012F00000200AD4A01 /* adhan_1.caf */,
+				A7DA4A022F00000200AD4A01 /* adhan_2.caf */,
+				A7DA4A032F00000200AD4A01 /* adhan_3.caf */,
+				A7DA4A042F00000200AD4A01 /* adhan_4.caf */,
+				A7DA4A052F00000200AD4A01 /* adhan_5.caf */,
+			);
+			path = Sounds;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -139,6 +162,11 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A7DA4A012F00000100AD4A01 /* adhan_1.caf in Resources */,
+				A7DA4A022F00000100AD4A01 /* adhan_2.caf in Resources */,
+				A7DA4A032F00000100AD4A01 /* adhan_3.caf in Resources */,
+				A7DA4A042F00000100AD4A01 /* adhan_4.caf in Resources */,
+				A7DA4A052F00000100AD4A01 /* adhan_5.caf in Resources */,
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,

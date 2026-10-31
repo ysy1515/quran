@@ -257,6 +257,33 @@ test.describe("prayer", () => {
   });
 });
 
+test.describe("prayer settings", () => {
+  test("choosing Khamis Mushait by hand gives its Umm al-Qura times", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-10-31T09:00:00+03:00"));
+    await open(page, "/adhan/settings");
+    await page.getByTestId("choose-city").click();
+    await page.getByTestId("city-khamis-mushait").click();
+    await expect(page.getByText("خميس مشيط").first()).toBeVisible();
+    await page.goto("/adhan");
+    await expect(page.getByTestId("prayer-fajr")).toContainText("04:52");
+    await expect(page.getByTestId("prayer-asr")).toContainText("03:10");
+    await expect(page.getByTestId("prayer-isha")).toContainText("07:07");
+  });
+
+  test("muezzin, alert sound, Asr method and early alert persist after a reload", async ({ page }) => {
+    await open(page, "/adhan/settings", { adhan_coords: { lat: 18.3, lng: 42.7333 }, adhan_prefs: { enabled: true, enabledPrayers: ["fajr", "dhuhr", "asr", "maghrib", "isha"], snoozedUntil: null, calcMethod: "UmmAlQura", madhab: "Shafi", reminderMinutes: 0, muezzinId: "adhan-1", prefsVersion: 2 } });
+    await page.getByTestId("muezzin-adhan-4").click();
+    await page.getByRole("tab", { name: "صوت الجهاز" }).click();
+    await page.getByRole("tab", { name: "حنفي" }).click();
+    await page.getByRole("tab", { name: "١٠ د" }).click();
+    await page.reload();
+    await expect(page.getByRole("radio", { name: /أذان ٤/ })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("tab", { name: "صوت الجهاز" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: "حنفي" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: "١٠ د" })).toHaveAttribute("aria-selected", "true");
+  });
+});
+
 const PUBLIC_PAGES = [
   {
     path: "/support",

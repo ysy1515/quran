@@ -1,5 +1,6 @@
 import { createLocalStore, useLocalStore } from "./localStore";
 import { isCapacitorNative } from "./appConfig";
+import { ANDROID_REMINDERS_CHANNEL } from "./muezzins";
 
 // Daily reminders (wird, morning/evening athkar, sunnah surahs). They are local
 // notifications repeating every day at the chosen time, scheduled on the device.
@@ -93,7 +94,13 @@ export async function syncReminders(r: Reminders = remindersStore.get()): Promis
         title: REMINDER_TEXT[id].title,
         body: REMINDER_TEXT[id].body,
         schedule: { on: { hour, minute }, allowWhileIdle: true },
-        extra: { route: REMINDER_TEXT[id].route },
+        // iOS plays no sound unless one is named; "default" is the system notification sound.
+        // Android 8+ takes the sound from the channel (created in MainActivity.java).
+        sound: "default",
+        channelId: ANDROID_REMINDERS_CHANNEL,
+        smallIcon: "ic_stat_mushafak",
+        iconColor: "#1a4731",
+        extra: { route: REMINDER_TEXT[id].route, kind: "reminder" },
       };
     });
     if (notifications.length) await ln.schedule({ notifications });

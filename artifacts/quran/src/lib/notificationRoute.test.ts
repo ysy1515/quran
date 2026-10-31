@@ -11,6 +11,10 @@ describe("notification tap navigation", () => {
     expect(notificationRoute({ route: "/adhan", prayer: "fajr", day: "0" })).toBe("/adhan");
   });
 
+  it("opens the adhan settings for the test notification", () => {
+    expect(notificationRoute({ route: "/adhan/settings", kind: "test" })).toBe("/adhan/settings");
+  });
+
   it("ignores missing, foreign or malformed routes", () => {
     expect(notificationRoute(undefined)).toBeNull();
     expect(notificationRoute({ prayer: "fajr" })).toBeNull();
