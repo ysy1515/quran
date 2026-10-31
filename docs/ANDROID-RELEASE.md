@@ -11,7 +11,7 @@ Nothing here changes the iOS project, its bundle ID or the TestFlight workflows.
 | Display name | مصحفك (`res/values/strings.xml`) |
 | minSdk / compileSdk / targetSdk | 24 / 36 / 36 (Android 16; Play requires target 36 for new apps from 31 Aug 2026) |
 | Build tools | Android Gradle Plugin 8.13, Gradle 8.14.3, Java 21 |
-| Version | `versionName` 1.0.4 (same as iOS), `versionCode` from Codemagic (see below) |
+| Version | `versionName` 1.0.5 (same as iOS), `versionCode` from Codemagic (see below) |
 | Plugins | haptics, local-notifications (patched, see `MOBILE_NOTIFICATIONS.md`), preferences, status-bar |
 | Icon | Adaptive icon from the approved brand (open Mushaf + Rub el Hizb on deep green); legacy and round icons from `docs/brand/app-icon-1024.png` |
 | Splash | Brand splash (same artwork as iOS) |

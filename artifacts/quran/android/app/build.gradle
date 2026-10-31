@@ -18,7 +18,7 @@ def releaseStoreFile = signingValue('CM_KEYSTORE_PATH', 'storeFile')
 // Version: versionCode must grow with every upload to Google Play. Codemagic passes it
 // in ANDROID_VERSION_CODE (see codemagic.yaml); local builds fall back to 1.
 def appVersionCode = (System.getenv('ANDROID_VERSION_CODE') ?: '1') as Integer
-def appVersionName = System.getenv('ANDROID_VERSION_NAME') ?: '1.0.4'
+def appVersionName = System.getenv('ANDROID_VERSION_NAME') ?: '1.0.5'
 
 android {
     namespace = "com.yahya.quran"
