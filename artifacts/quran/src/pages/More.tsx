@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Screen from "@/components/shell/Screen";
 import { BrandLockup } from "@/components/brand/Brand";
@@ -7,7 +7,7 @@ import { useKhatmah } from "@/lib/khatmah";
 import { useBookmarks, useFavorites } from "@/lib/bookmarks";
 import { useReadingProgress } from "@/lib/userData";
 import { useReadingTime } from "@/lib/readingTime";
-import { REMINDER_TEXT, remindersSupported, setReminder, useReminders, type ReminderId } from "@/lib/reminders";
+import { REMINDER_TEXT, remindersStore, remindersSupported, setReminder, useReminders, type ReminderId } from "@/lib/reminders";
 import { useDhikrState } from "@/lib/dhikr";
 import { rateApp, shareApp } from "@/lib/appActions";
 import { ayahCount, surahName } from "@workspace/quran-meta";
@@ -26,6 +26,13 @@ function ReminderRow({ id, label, hint }: { id: ReminderId; label: string; hint?
   const r = reminders[id];
   const supported = remindersSupported();
   const [saving, setSaving] = useState(false);
+  // The time picker edits a local draft. iOS fires "change" on every turn of the wheel;
+  // saving each one (and disabling the input meanwhile) closed the picker and snapped the
+  // time back. The draft is saved once, when the picker closes or after a short pause.
+  const [draft, setDraft] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const savingTime = useRef<string | null>(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   const apply = async (patch: { on?: boolean; time?: string }) => {
     setSaving(true);
@@ -34,9 +41,22 @@ function ReminderRow({ id, label, hint }: { id: ReminderId; label: string; hint?
       if (res === "denied") toast.error("لم يتم منح إذن الإشعارات، يرجى السماح من إعدادات الجهاز");
       else if (res === "error") toast.error("تعذّر حفظ التذكير، حاول مرة أخرى");
       else if (res === "ok" && patch.on) toast.success(`سيصلك تذكير ${REMINDER_TEXT[id].title} يوميًا`);
+      else if (res === "ok" && patch.time) toast.success(`تم ضبط ${REMINDER_TEXT[id].title} على ${patch.time}`);
     } finally {
       setSaving(false);
     }
+  };
+
+  // Keeps showing the new time while it is saved; on failure it returns to the saved one.
+  const saveTime = (t: string) => {
+    clearTimeout(timer.current);
+    if (t === remindersStore.get()[id].time) return setDraft(null);
+    if (savingTime.current === t) return;
+    savingTime.current = t;
+    void apply({ time: t }).finally(() => {
+      savingTime.current = null;
+      setDraft((d) => (d === t ? null : d));
+    });
   };
 
   return (
@@ -48,9 +68,15 @@ function ReminderRow({ id, label, hint }: { id: ReminderId; label: string; hint?
       {r.on && supported && (
         <input
           type="time"
-          disabled={saving}
-          value={r.time}
-          onChange={(e) => e.target.value && void apply({ time: e.target.value })}
+          value={draft ?? r.time}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (!v) return;
+            setDraft(v);
+            clearTimeout(timer.current);
+            timer.current = setTimeout(() => saveTime(v), 1500);
+          }}
+          onBlur={() => draft && saveTime(draft)}
           className="time-value"
           aria-label={`وقت ${label}`}
           dir="ltr"

@@ -29,7 +29,7 @@ import {
   pendingNotifications,
   sendTestNotification,
   syncPrayerNotifications,
-  type PendingSummary,
+  type PendingOverview,
 } from "@/lib/prayerNotifications";
 
 const CALC_METHODS: { id: string; label: string }[] = [
@@ -89,7 +89,7 @@ export default function AdhanSettings() {
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const [cityOpen, setCityOpen] = useState(false);
   const [exact, setExact] = useState<"granted" | "denied" | "unsupported">("unsupported");
-  const [diag, setDiag] = useState<{ total: number; prayer: PendingSummary[] } | null>(null);
+  const [diag, setDiag] = useState<PendingOverview | null>(null);
   const snoozed = isSnoozed(prefs.snoozedUntil);
   const platform = getCapacitorPlatform();
   const native = isCapacitorNative();
@@ -360,6 +360,19 @@ export default function AdhanSettings() {
                       <span dir="ltr" className="tabular-nums text-muted-foreground">
                         #{n.id} · {timeLabel(n.at)}
                         {n.prayerTime && n.at && n.prayerTime.getTime() !== n.at.getTime() ? ` (الأذان ${clock(n.prayerTime).time})` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="font-bold mt-3 mb-1" data-testid="diagnostics-reminders">
+                  التذكيرات اليومية المجدولة: {diag.reminders.length ? "" : "لا يوجد"}
+                </p>
+                <ul className="space-y-1" dir="rtl">
+                  {diag.reminders.map((n) => (
+                    <li key={n.id} className="flex gap-2 justify-between">
+                      <span>{n.title}</span>
+                      <span dir="ltr" className="tabular-nums text-muted-foreground">
+                        #{n.id} · {n.time}
                       </span>
                     </li>
                   ))}

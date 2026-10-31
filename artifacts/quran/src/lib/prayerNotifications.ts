@@ -192,9 +192,21 @@ export interface PendingSummary {
   prayerTime: Date | null;
 }
 
+export interface PendingReminder {
+  id: number;
+  title: string;
+  time: string; // "HH:MM" of the daily repeat
+}
+
+export interface PendingOverview {
+  total: number;
+  prayer: PendingSummary[];
+  reminders: PendingReminder[];
+}
+
 /** What is pending on the device, for the diagnostics section. */
-export async function pendingNotifications(): Promise<{ total: number; prayer: PendingSummary[] }> {
-  if (!isCapacitorNative()) return { total: 0, prayer: [] };
+export async function pendingNotifications(): Promise<PendingOverview> {
+  if (!isCapacitorNative()) return { total: 0, prayer: [], reminders: [] };
   try {
     const all = (await (await plugin()).getPending()).notifications;
     const num = (v: unknown) => (typeof v === "string" && v ? new Date(Number(v)) : null);
@@ -206,8 +218,13 @@ export async function pendingNotifications(): Promise<{ total: number; prayer: P
         return { id: n.id, at, title: n.title, kind: String(extra.kind ?? ""), prayerTime: num(extra.prayerTime) };
       })
       .sort((a, b) => (a.at?.getTime() ?? 0) - (b.at?.getTime() ?? 0));
-    return { total: all.length, prayer };
+    const two = (v: unknown) => String(typeof v === "number" ? v : 0).padStart(2, "0");
+    const reminders = all
+      .filter((n) => n.id >= 2000 && n.id < 2100)
+      .map((n) => ({ id: n.id, title: n.title, time: `${two(n.schedule?.on?.hour)}:${two(n.schedule?.on?.minute)}` }))
+      .sort((a, b) => a.id - b.id);
+    return { total: all.length, prayer, reminders };
   } catch {
-    return { total: 0, prayer: [] };
+    return { total: 0, prayer: [], reminders: [] };
   }
 }

@@ -248,11 +248,23 @@ test.describe("tasbeeh", () => {
     await page.reload();
     await expect(page.getByTestId("dhikr-count")).toHaveText("٣");
     await page.getByTestId("dhikr-reset").click();
-    await page.getByTestId("confirm-no").click();
+    await page.keyboard.press("Escape");
     await expect(page.getByTestId("dhikr-count")).toHaveText("٣");
     await page.getByTestId("dhikr-reset").click();
-    await page.getByTestId("confirm-yes").click();
+    await page.getByTestId("dhikr-reset-count").click();
     await expect(page.getByTestId("dhikr-count")).toHaveText("٠");
+  });
+
+  test("finished rounds can be reset on their own, and stay reset after a reload", async ({ page }) => {
+    await open(page, "/dhikr", { "dhikr-state": { presetText: "سُبْحَانَ اللَّهِ", target: 33, sessions: 5, count: 2 } });
+    await expect(page.getByTestId("dhikr-sessions")).toHaveText("٥");
+    await page.getByTestId("dhikr-sessions").click();
+    await page.getByTestId("dhikr-reset-sessions").click();
+    await expect(page.getByTestId("dhikr-sessions")).toHaveText("٠");
+    await expect(page.getByTestId("dhikr-count")).toHaveText("٢");
+    await page.reload();
+    await expect(page.getByTestId("dhikr-sessions")).toHaveText("٠");
+    await expect(page.getByTestId("dhikr-count")).toHaveText("٢");
   });
 });
 
