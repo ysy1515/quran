@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { Component, type ReactNode } from "react";
 import { setBaseUrl } from "@workspace/api-client-react";
 import App from "./App";
+import { initPersistence } from "./lib/persistence";
 import "./fonts";
 import "./index.css";
 
@@ -107,7 +108,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
-try {
+function render() {
   const rootEl = document.getElementById("root");
   if (!rootEl) throw new Error("Root element #root not found");
 
@@ -116,7 +117,9 @@ try {
       <App onMounted={hideNativeLoadingOverlay} />
     </ErrorBoundary>
   );
-} catch (err) {
+}
+
+function renderFailed(err: unknown) {
   hideNativeLoadingOverlay();
   const rootEl = document.getElementById("root");
   if (rootEl) {
@@ -137,3 +140,15 @@ try {
   }
   if (import.meta.env.DEV) console.error("[Quran App] Critical startup error:", err);
 }
+
+// Saved data (khatmah, bookmarks, tasbeeh, prayer and reminder settings) is loaded
+// from native Preferences before the first render, and anything only found in the
+// WebView's localStorage is copied there once (never deleted or overwritten).
+// Without this the native app kept everything in localStorage only, which iOS may clear.
+void initPersistence().finally(() => {
+  try {
+    render();
+  } catch (err) {
+    renderFailed(err);
+  }
+});

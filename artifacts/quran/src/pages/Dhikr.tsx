@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import Screen from "@/components/shell/Screen";
-import Sheet, { ConfirmSheet } from "@/components/kit/Sheet";
+import Sheet from "@/components/kit/Sheet";
+import { ListRow } from "@/components/kit/List";
 import { Icon } from "@/components/icons/Icon";
-import { chooseDhikr, resetDhikrCount, setDhikrTarget, tapDhikr, useDhikrState } from "@/lib/dhikr";
+import { chooseDhikr, resetDhikrAll, resetDhikrCount, resetDhikrSessions, setDhikrTarget, tapDhikr, useDhikrState } from "@/lib/dhikr";
 import { hapticSuccess, hapticTap } from "@/lib/haptics";
 import { ar } from "@/lib/format";
 
@@ -77,7 +78,7 @@ export default function Dhikr() {
         {
           label: "تصفير العداد",
           icon: <Icon name="refresh" size={24} />,
-          onClick: () => (count > 0 ? setSheet("reset") : undefined),
+          onClick: () => (count > 0 || sessions > 0 ? setSheet("reset") : undefined),
           testId: "dhikr-reset",
         },
       ]}
@@ -143,10 +144,15 @@ export default function Dhikr() {
             <p className="text-xl font-extrabold text-primary dark:text-gold">{ar(target)}</p>
             <p className="text-xs text-muted-foreground">الهدف</p>
           </button>
-          <div>
+          <button
+            type="button"
+            onClick={() => (count > 0 || sessions > 0 ? setSheet("reset") : undefined)}
+            className="min-h-11"
+            aria-label={`الدورات المكتملة ${ar(sessions)}، اضغط للتصفير`}
+          >
             <p className="text-xl font-extrabold text-foreground" data-testid="dhikr-sessions">{ar(sessions)}</p>
             <p className="text-xs text-muted-foreground">الدورات</p>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -198,15 +204,46 @@ export default function Dhikr() {
         <p className="text-xs text-muted-foreground text-center pt-3 pb-2">تغيير الهدف يبدأ العدّ من الصفر.</p>
       </Sheet>
 
-      <ConfirmSheet
-        open={sheet === "reset"}
-        onClose={() => setSheet(null)}
-        onConfirm={resetDhikrCount}
-        title="تصفير العداد؟"
-        message={`سيبدأ العدّ من الصفر. تبقى الدورات المكتملة (${ar(sessions)}).`}
-        confirmLabel="تصفير"
-        danger
-      />
+      <Sheet open={sheet === "reset"} onClose={() => setSheet(null)} title="تصفير العداد">
+        <div className="list-group -mx-1 mb-2" data-testid="dhikr-reset-sheet">
+          {count > 0 && (
+            <ListRow
+              label="تصفير العدّ الحالي"
+              hint={`يبدأ العدّ من الصفر، وتبقى الدورات (${ar(sessions)})`}
+              chevron={false}
+              testId="dhikr-reset-count"
+              onClick={() => {
+                resetDhikrCount();
+                setSheet(null);
+              }}
+            />
+          )}
+          {sessions > 0 && (
+            <ListRow
+              label="تصفير الدورات"
+              hint={`تعود الدورات المكتملة (${ar(sessions)}) إلى صفر، ويبقى العدّ الحالي`}
+              chevron={false}
+              testId="dhikr-reset-sessions"
+              onClick={() => {
+                resetDhikrSessions();
+                setSheet(null);
+              }}
+            />
+          )}
+          {count > 0 && sessions > 0 && (
+            <ListRow
+              label="تصفير الكل"
+              hint="العدّ والدورات معًا"
+              chevron={false}
+              testId="dhikr-reset-all"
+              onClick={() => {
+                resetDhikrAll();
+                setSheet(null);
+              }}
+            />
+          )}
+        </div>
+      </Sheet>
     </Screen>
   );
 }

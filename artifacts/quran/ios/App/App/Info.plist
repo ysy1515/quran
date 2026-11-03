@@ -47,7 +47,7 @@
         <true/>
     <!-- Geolocation — required for prayer time calculation -->
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>يستخدم التطبيق موقعك لحساب مواقيت الصلاة بدقة حسب مكانك</string>
+    <string>يستخدم التطبيق موقعك لحساب مواقيت الصلاة واتجاه القبلة حسب مكانك</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>يستخدم التطبيق موقعك لتنبيهات الأذان في الوقت الصحيح</string>
     <!-- Status bar -->

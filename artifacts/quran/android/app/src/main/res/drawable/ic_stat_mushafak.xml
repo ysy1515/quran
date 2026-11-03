@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification status-bar icon: the مصحفك symbol (open Mushaf under a Rub el Hizb) as a
+     white silhouette. Android tints it; colour and gradients are ignored in the status bar. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100"
+    android:tint="#FFFFFF">
+    <group android:translateY="-4">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M48.8,81.2 C40,75.6 27.6,72.9 13,74 L13,42 L17,38 C30,37 41.6,40 48.8,45.4 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M51.2,81.2 C60,75.6 72.4,72.9 87,74 L87,42 L83,38 C70,37 58.4,40 51.2,45.4 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M46.6,83 L53.4,83 L53.4,96 L50,92.6 L46.6,96 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M60.62,29.4 L56.22,31.22 L54.4,35.62 L50,33.8 L45.6,35.62 L43.78,31.22 L39.38,29.4 L41.2,25 L39.38,20.6 L43.78,18.78 L45.6,14.38 L50,16.2 L54.4,14.38 L56.22,18.78 L60.62,20.6 L58.8,25 Z M54.8,26.99 L52.81,27.81 L51.99,29.8 L50,28.98 L48.01,29.8 L47.19,27.81 L45.2,26.99 L46.02,25 L45.2,23.01 L47.19,22.19 L48.01,20.2 L50,21.02 L51.99,20.2 L52.81,22.19 L54.8,23.01 L53.98,25 Z" />
+    </group>
+</vector>

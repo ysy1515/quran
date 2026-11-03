@@ -20,7 +20,7 @@ export const TABS: TabItem[] = [
     href: "/more",
     label: "المزيد",
     icon: "more",
-    match: ["/more", "/settings", "/about", "/bookmarks", "/favorites", "/tafsir-translations", "/reminders"],
+    match: ["/more", "/qibla", "/settings", "/about", "/bookmarks", "/favorites", "/tafsir-translations", "/reminders"],
   },
 ];
 

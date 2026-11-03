@@ -10,6 +10,37 @@ const TABS = [
   { path: "/more", label: "المزيد" },
 ];
 
+test("enables adhan on the first click after acquiring location and persists across reload", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.geolocation, "getCurrentPosition", {
+      value: (success: PositionCallback) => success({ coords: { latitude: 18.3, longitude: 42.7333, accuracy: 10 } } as GeolocationPosition),
+    });
+    Object.defineProperty(Notification, "requestPermission", { value: async () => "granted" });
+  });
+  await open(page, "/adhan/settings");
+  const toggle = page.getByTestId("adhan-enabled");
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await toggle.click();
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+});
+
+test("does not enable adhan when location is refused", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.geolocation, "getCurrentPosition", {
+      value: (_success: PositionCallback, error: PositionErrorCallback) => error({ code: 1 } as GeolocationPositionError),
+    });
+  });
+  await open(page, "/adhan/settings");
+  await page.getByTestId("adhan-enabled").click();
+  await expect(page.getByText("تم رفض الوصول إلى الموقع، يمكنك السماح من الإعدادات أو اختيار مدينتك")).toBeVisible();
+  await expect(page.getByTestId("adhan-enabled")).toHaveAttribute("aria-checked", "false");
+});
+
 async function open(page: Page, path: string, storage: Record<string, unknown> = {}) {
   await page.addInitScript((seed) => {
     sessionStorage.setItem("splash-shown", "1");
@@ -70,7 +101,7 @@ test.describe("layout", () => {
   for (const width of [320, 390, 430]) {
     test(`no horizontal overflow at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 700 });
-      for (const path of ["/", "/khatmah/new", "/athkar", "/athkar/morning", "/adhan", "/adhan/settings", "/index", "/index?tab=juz", "/more", "/dhikr", "/mushaf/2", "/bookmarks", "/settings"]) {
+      for (const path of ["/", "/khatmah/new", "/athkar", "/athkar/morning", "/adhan", "/adhan/settings", "/index", "/index?tab=juz", "/more", "/dhikr", "/mushaf/2", "/bookmarks", "/settings", "/qibla"]) {
         await open(page, path);
         const overflow = await page.evaluate(() =>
           [...document.querySelectorAll<HTMLElement>("body *")].filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1).length,
@@ -91,6 +122,27 @@ test.describe("layout", () => {
 });
 
 test.describe("khatmah", () => {
+  test("juz fractions show accurate totals and preserve the selected quarter-juz plan", async ({ page }) => {
+    await open(page, "/khatmah/new");
+    for (const [id, label, total] of [
+      ["rub", "ثُمن جزء في كل ورد", "٢٤٠"],
+      ["half-hizb", "ربع جزء في كل ورد", "١٢٠"],
+      ["hizb", "نصف جزء في كل ورد", "٦٠"],
+      ["juz", "جزء كامل في كل ورد", "٣٠"],
+    ]) {
+      const choice = page.getByTestId(`plan-${id}`);
+      await expect(choice).toContainText(label);
+      await choice.click();
+      await expect(page.getByTestId("plan-summary")).toContainText(total);
+    }
+    await page.getByTestId("plan-half-hizb").click();
+    await page.getByTestId("create-khatmah").click();
+    await expect(page.getByTestId("wird-size")).toHaveText("ربع جزء في كل ورد");
+    await page.reload();
+    await expect(page.getByTestId("wird-size")).toHaveText("ربع جزء في كل ورد");
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem("quran.khatmah.v1")!).plan.size)).toBe(2);
+  });
+
   test("start a plan, finish a wird, persist across reloads, undo", async ({ page }) => {
     await open(page, "/");
     await page.getByTestId("start-khatmah").click();
@@ -217,11 +269,23 @@ test.describe("tasbeeh", () => {
     await page.reload();
     await expect(page.getByTestId("dhikr-count")).toHaveText("٣");
     await page.getByTestId("dhikr-reset").click();
-    await page.getByTestId("confirm-no").click();
+    await page.keyboard.press("Escape");
     await expect(page.getByTestId("dhikr-count")).toHaveText("٣");
     await page.getByTestId("dhikr-reset").click();
-    await page.getByTestId("confirm-yes").click();
+    await page.getByTestId("dhikr-reset-count").click();
     await expect(page.getByTestId("dhikr-count")).toHaveText("٠");
+  });
+
+  test("finished rounds can be reset on their own, and stay reset after a reload", async ({ page }) => {
+    await open(page, "/dhikr", { "dhikr-state": { presetText: "سُبْحَانَ اللَّهِ", target: 33, sessions: 5, count: 2 } });
+    await expect(page.getByTestId("dhikr-sessions")).toHaveText("٥");
+    await page.getByTestId("dhikr-sessions").click();
+    await page.getByTestId("dhikr-reset-sessions").click();
+    await expect(page.getByTestId("dhikr-sessions")).toHaveText("٠");
+    await expect(page.getByTestId("dhikr-count")).toHaveText("٢");
+    await page.reload();
+    await expect(page.getByTestId("dhikr-sessions")).toHaveText("٠");
+    await expect(page.getByTestId("dhikr-count")).toHaveText("٢");
   });
 });
 
@@ -254,6 +318,33 @@ test.describe("prayer", () => {
     await expect(page.locator('[aria-current="time"]')).toHaveCount(1);
     await page.getByTestId("next-day").click();
     await expect(page.locator('[aria-current="time"]')).toHaveCount(0);
+  });
+});
+
+test.describe("prayer settings", () => {
+  test("choosing Khamis Mushait by hand gives its Umm al-Qura times", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-10-31T09:00:00+03:00"));
+    await open(page, "/adhan/settings");
+    await page.getByTestId("choose-city").click();
+    await page.getByTestId("city-khamis-mushait").click();
+    await expect(page.getByText("خميس مشيط").first()).toBeVisible();
+    await page.goto("/adhan");
+    await expect(page.getByTestId("prayer-fajr")).toContainText("04:52");
+    await expect(page.getByTestId("prayer-asr")).toContainText("03:10");
+    await expect(page.getByTestId("prayer-isha")).toContainText("07:07");
+  });
+
+  test("muezzin, alert sound, Asr method and early alert persist after a reload", async ({ page }) => {
+    await open(page, "/adhan/settings", { adhan_coords: { lat: 18.3, lng: 42.7333 }, adhan_prefs: { enabled: true, enabledPrayers: ["fajr", "dhuhr", "asr", "maghrib", "isha"], snoozedUntil: null, calcMethod: "UmmAlQura", madhab: "Shafi", reminderMinutes: 0, muezzinId: "adhan-1", prefsVersion: 2 } });
+    await page.getByTestId("muezzin-adhan-4").click();
+    await page.getByRole("tab", { name: "صوت الجهاز" }).click();
+    await page.getByRole("tab", { name: "حنفي" }).click();
+    await page.getByRole("tab", { name: "١٠ د" }).click();
+    await page.reload();
+    await expect(page.getByRole("radio", { name: /أذان ٤/ })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("tab", { name: "صوت الجهاز" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: "حنفي" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: "١٠ د" })).toHaveAttribute("aria-selected", "true");
   });
 });
 
@@ -354,4 +445,17 @@ test.describe("public pages", () => {
     await expect(page.getByTestId("privacy-updated")).toContainText("آخر تحديث");
     await expect(page.getByTestId("operator-name")).toHaveCount(APP_CONFIG.operatorName ? 1 : 0);
   });
+});
+
+test("header Qibla shortcut opens the compass from every main screen and returns", async ({ page }) => {
+  for (const path of ["/", "/athkar", "/adhan", "/index", "/more", "/mushaf/2", "/adhan/settings"]) {
+    await open(page, path);
+    await page.getByTestId("header-qibla").click();
+    await expect(page).toHaveURL(/\/qibla$/);
+    await expect(page.getByRole("img", { name: "الكعبة المشرفة" })).toBeVisible();
+    await expect(page.getByTestId("header-qibla")).toHaveAttribute("aria-pressed", "true");
+    await page.getByTestId("header-qibla").click();
+    await page.getByTestId("header-back").click();
+    await expect(page).toHaveURL(new RegExp(path === "/" ? "/$" : `${path}$`));
+  }
 });

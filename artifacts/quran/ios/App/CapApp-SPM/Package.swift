@@ -13,7 +13,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.3.2"),
         .package(name: "CapacitorHaptics", path: "../../../../../node_modules/.pnpm/@capacitor+haptics@8.0.2_@capacitor+core@8.3.2/node_modules/@capacitor/haptics"),
-        .package(name: "CapacitorLocalNotifications", path: "../../../../../node_modules/.pnpm/@capacitor+local-notifications@8.1.0_@capacitor+core@8.3.2/node_modules/@capacitor/local-notifications"),
+        .package(name: "CapacitorLocalNotifications", path: "../../../../../node_modules/.pnpm/@capacitor+local-notifications@8.1.0_patch_hash=28066245403dfa60df174f6b8cae918cd047403_3f8aaf9af732c478c099e1eb70de81fc/node_modules/@capacitor/local-notifications"),
         .package(name: "CapacitorPreferences", path: "../../../../../node_modules/.pnpm/@capacitor+preferences@8.0.1_@capacitor+core@8.3.2/node_modules/@capacitor/preferences"),
         .package(name: "CapacitorStatusBar", path: "../../../../../node_modules/.pnpm/@capacitor+status-bar@8.0.2_@capacitor+core@8.3.2/node_modules/@capacitor/status-bar")
     ],

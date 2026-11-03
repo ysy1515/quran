@@ -88,6 +88,8 @@ export default function Screen({
   const [location, navigate] = useLocation();
   const hidden = useChromeHidden();
   const body = useRef<HTMLElement | null>(null);
+  const sideButtons = Math.max(startActions.length + 1 + (back !== undefined ? 1 : 0), endActions.length);
+  const sideWidth = sideButtons * 44 + Math.max(0, sideButtons - 1) * 2;
 
   useLayoutEffect(() => {
     const el = body.current;
@@ -105,7 +107,7 @@ export default function Screen({
         data-testid="app-header"
         aria-hidden={hidden || undefined}
       >
-        <div className="app-header__row">
+        <div className="app-header__row" style={{ gridTemplateColumns: `${sideWidth}px minmax(0, 1fr) ${sideWidth}px` }}>
           <div className="app-header__side">
             {back !== undefined && (
               <button
@@ -121,6 +123,13 @@ export default function Screen({
             {startActions.map((a) => (
               <HeaderButton key={a.label} action={a} />
             ))}
+            <HeaderButton action={{
+              label: "فتح القبلة",
+              icon: <Icon name="kaaba" size={24} />,
+              onClick: () => { if (location !== "/qibla") navigate("/qibla"); },
+              pressed: location === "/qibla",
+              testId: "header-qibla",
+            }} />
           </div>
           <div className="app-header__title">
             <h1>{title}</h1>

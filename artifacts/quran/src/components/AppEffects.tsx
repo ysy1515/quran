@@ -1,11 +1,17 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useTheme } from "next-themes";
-import { useLocalNotifications } from "@/hooks/useLocalNotifications";
-import { useAdhanPrefs, useCoords } from "@/lib/prayer";
+import { useAdhanPrefs, useCoords, adhanPrefsStore } from "@/lib/prayer";
 import { syncReminders } from "@/lib/reminders";
-import { isCapacitorNative } from "@/lib/appConfig";
+import { getCapacitorPlatform, isCapacitorNative } from "@/lib/appConfig";
 import { notificationRoute } from "@/lib/notificationRoute";
+import { syncPrayerNotifications } from "@/lib/prayerNotifications";
+import { shouldPlayFullAdhanOnTap } from "@/lib/notificationTap";
+import { muezzinFor } from "@/lib/muezzins";
+import { playAdhan } from "@/lib/adhanPlayer";
+import { maybeRequestReview, recordReviewVisit } from "@/lib/appReview";
+
+const RESYNC_INTERVAL_MS = 30 * 60_000;
 
 /**
  * App-wide side effects that must run whichever screen is open:
@@ -13,15 +19,48 @@ import { notificationRoute } from "@/lib/notificationRoute";
  * status bar matches the green header, and tapping a reminder opens its screen.
  */
 export default function AppEffects() {
-  const [, navigate] = useLocation();
+  const [route, navigate] = useLocation();
   const prefs = useAdhanPrefs();
   const coords = useCoords();
-  const { schedulePrayers } = useLocalNotifications();
   const { resolvedTheme } = useTheme();
 
+  // Ask only on the home screen, after established use, never over the reader.
   useEffect(() => {
-    void schedulePrayers(coords, prefs);
-  }, [coords, prefs, schedulePrayers]);
+    if (getCapacitorPlatform() !== "ios") return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const consider = () => {
+      clearTimeout(timer);
+      if (document.visibilityState !== "visible") return;
+      recordReviewVisit();
+      if (route === "/") timer = setTimeout(() => {
+        if (document.visibilityState === "visible") void maybeRequestReview();
+      }, 4000);
+    };
+    consider();
+    document.addEventListener("visibilitychange", consider);
+    return () => { clearTimeout(timer); document.removeEventListener("visibilitychange", consider); };
+  }, [route]);
+
+  // Settings or location changed: bring the pending prayer notifications in line.
+  useEffect(() => {
+    void syncPrayerNotifications(coords, prefs);
+  }, [coords, prefs]);
+
+  // Resume, and a periodic refresh while open, move the 7-day window forward and
+  // pick up a new day, a changed clock or time zone, or a permission granted in Settings.
+  useEffect(() => {
+    const resync = () => {
+      if (document.visibilityState !== "visible") return;
+      void syncPrayerNotifications(coords, prefs);
+      void syncReminders();
+    };
+    document.addEventListener("visibilitychange", resync);
+    const t = setInterval(resync, RESYNC_INTERVAL_MS);
+    return () => {
+      document.removeEventListener("visibilitychange", resync);
+      clearInterval(t);
+    };
+  }, [coords, prefs]);
 
   useEffect(() => {
     void syncReminders();
@@ -40,7 +79,13 @@ export default function AppEffects() {
     import("@capacitor/local-notifications")
       .then(({ LocalNotifications }) =>
         LocalNotifications.addListener("localNotificationActionPerformed", (e) => {
-          const route = notificationRoute(e.notification.extra);
+          const extra = e.notification.extra;
+          const p = adhanPrefsStore.get();
+          if (shouldPlayFullAdhanOnTap(extra, getCapacitorPlatform(), p.alertSound, Date.now())) {
+            const m = muezzinFor(p.muezzinId);
+            void playAdhan(m.id, m.audioUrl);
+          }
+          const route = notificationRoute(extra);
           if (route) navigate(route);
         }),
       )

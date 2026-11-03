@@ -2,5 +2,14 @@
 include ':capacitor-android'
 project(':capacitor-android').projectDir = new File('../../../node_modules/.pnpm/@capacitor+android@8.3.2_@capacitor+core@8.3.2/node_modules/@capacitor/android/capacitor')
 
+include ':capacitor-haptics'
+project(':capacitor-haptics').projectDir = new File('../../../node_modules/.pnpm/@capacitor+haptics@8.0.2_@capacitor+core@8.3.2/node_modules/@capacitor/haptics/android')
+
 include ':capacitor-local-notifications'
-project(':capacitor-local-notifications').projectDir = new File('../../../node_modules/.pnpm/@capacitor+local-notifications@8.1.0_@capacitor+core@8.3.2/node_modules/@capacitor/local-notifications/android')
+project(':capacitor-local-notifications').projectDir = new File('../../../node_modules/.pnpm/@capacitor+local-notifications@8.1.0_patch_hash=28066245403dfa60df174f6b8cae918cd047403_3f8aaf9af732c478c099e1eb70de81fc/node_modules/@capacitor/local-notifications/android')
+
+include ':capacitor-preferences'
+project(':capacitor-preferences').projectDir = new File('../../../node_modules/.pnpm/@capacitor+preferences@8.0.1_@capacitor+core@8.3.2/node_modules/@capacitor/preferences/android')
+
+include ':capacitor-status-bar'
+project(':capacitor-status-bar').projectDir = new File('../../../node_modules/.pnpm/@capacitor+status-bar@8.0.2_@capacitor+core@8.3.2/node_modules/@capacitor/status-bar/android')

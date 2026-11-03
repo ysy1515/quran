@@ -1,258 +1,85 @@
-# Mobile Notifications — القرآن الكريم
+# Prayer notifications, adhan audio and reminders — مصحفك
 
-## What Was Implemented
+This is how notifications work in the native app (iOS and Android), what was wrong
+before October 2026, and what can only be checked on a real phone.
 
-### 1. Local Notifications (Primary — Prayer Reminders)
-Implemented via `@capacitor/local-notifications`. This is the **recommended approach** for prayer-time reminders because:
-- Works **offline** — no server required
-- Fires **exactly on time** using the device's clock
-- Uses the on-device prayer time calculation (same `adhan` library as the UI)
-- Supports scheduling for **today + tomorrow** (refreshed daily on app open)
+## Two separate systems
 
-Hook: `artifacts/quran/src/hooks/useLocalNotifications.ts`
+| System | Where | Used for | Code |
+|---|---|---|---|
+| **Local notifications** (`@capacitor/local-notifications`) | iOS and Android app | Prayer alerts (IDs 1000–1999) and the daily reminders: wird, morning/evening athkar, Al-Mulk, Al-Baqarah (IDs 2000–2099) | `src/lib/prayerSchedule.ts`, `src/lib/prayerNotifications.ts`, `src/lib/reminders.ts` |
+| **Web Push** (VAPID, service worker) | Website in a browser only | Quran and evening-athkar reminders for browser users, sent by the API server at Saudi times | `src/hooks/usePushNotifications.ts`, `artifacts/api-server` |
 
-### 2. Web Push Notifications (Secondary — Remote Announcements)
-Already implemented via VAPID/Web Push (`@capacitor/push-notifications` base).
-- Used for server-triggered announcements
-- Device tokens registered via `POST /api/notifications/register-device`
-- Requires Firebase (Android) or APNs (iOS) for native push
+The native app never uses Web Push (`usePushNotifications` reports `native` and the
+browser-notification section of Settings is hidden). No Firebase, APNs push or backend is
+involved in prayer alerts: they are calculated and scheduled on the phone.
 
----
+## Audit findings (root causes)
 
-## Notification Flow
+| # | Problem | Root cause (verified in code) | Platform | Fix |
+|---|---|---|---|---|
+| 1 | Prayer banners appear without sound | Notifications were scheduled without a `sound`. The plugin sets `content.sound` only when one is given, and documents "no sound on iOS" otherwise (`LocalNotificationsPlugin.swift`, `definitions.d.ts`). The `sound: "default"` in `capacitor.config.ts` is Android-only. Daily reminders had the same bug. | iOS | Every notification names a sound: a bundled adhan clip, or `"default"` for the system sound. |
+| 2 | Prayer alerts never shown on Android | They used `channelId: "prayer-reminders"`, a channel that was never created. Android 8+ drops notifications posted to a missing channel. | Android | Channels are created natively at launch (`NotificationChannels.java`). |
+| 3 | Selected muezzin never heard at prayer time | `muezzinId` was used only by the preview button. No code path played it at prayer time, and the in-app "announcement" was only a toast. | Both | The muezzin now sets the notification sound (iOS clip / Android full recording) and the full adhan plays in-app after tapping (iOS). |
+| 4 | Alerts late | Android: alarms were `setExact(RTC)` without `allowWhileIdle`, which Doze defers to the next maintenance window, and without `SCHEDULE_EXACT_ALARM` the plugin falls back to an inexact `set()`. After a reboot the plugin re-fired every missed alert 15 s after boot (so a Fajr alert could arrive at noon). | Android | `allowWhileIdle: true` (→ `setExactAndAllowWhileIdle(RTC_WAKEUP)`), `SCHEDULE_EXACT_ALARM` with an in-app prompt, and a patch that drops alerts more than 10 minutes stale after boot. |
+| 5 | Alerts stop after two days | Only today and tomorrow were scheduled, and only when settings changed (a cached key blocked rescheduling while the app stayed open, across day changes and resumes). | Both | 7-day rolling window, refreshed on start, resume, every 30 min while open and on any change; an "open the app" notice on the last day. |
+| 6 | Settings could appear to revert | The native entry point (`main.mobile.tsx`) never called `initPersistence()`, so every setting, bookmark, khatmah and tasbeeh count lived only in WebView `localStorage`, which iOS may clear. | Both | `initPersistence()` now runs before the first render on native: data is copied once into Capacitor Preferences (never deleted or overwritten). |
+| 7 | GPS city label could be wrong | A new GPS fix kept the previous place name until the online lookup finished; offline it stayed wrong. | Both | The old name is cleared with new coordinates; a manual city list is added. |
+| 8 | Duplicates possible | A browser `Notification` was also shown from the prayer screen at prayer time, and sequential IDs depended on the order of scheduling. | Both | No browser notification inside the native app; IDs are derived from the date and prayer. |
 
-```
-User opens Adhan page
-        ↓
-Taps "تفعيل" → requestLocalPermission()
-        ↓
-Permission granted → schedulePrayers(coords, prefs)
-        ↓
-LocalNotifications.schedule() called for today + tomorrow
-        ↓
-On each app open: reschedule (idempotent, cancels old + creates new)
-        ↓
-Notification fires at prayer time - reminderMinutes
-```
+## How a prayer alert sounds now
 
----
-
-## Notification Settings (in Adhan Page)
-
-| Setting | Description |
-|---|---|
-| تفعيل / إيقاف | Master toggle for all prayer reminders |
-| Per-prayer toggles | Enable/disable each prayer individually |
-| تذكير قبل الصلاة | 0 / 5 / 10 / 15 minutes before |
-| اختيار المؤذن | Stored in preferences, affects in-app audio preview |
-| إيقاف مؤقت | Snooze 3/5/7 days or until manually resumed |
-
----
-
-## API Endpoints Added
-
-| Endpoint | Method | Description |
+| Setting "صوت التنبيه" | iOS | Android 8+ |
 |---|---|---|
-| `/api/notifications/register-device` | POST | Register native device token |
-| `/api/notifications/update-preferences` | POST | Update prayer prefs for a device |
-| `/api/notifications/unregister-device` | DELETE | Remove a device token |
+| الأذان (default) | First 29 s of the selected adhan (`ios/App/App/Sounds/adhan_N.caf`). iOS plays at most 30 s for a notification sound. Tapping the notification opens the app and plays the **full** adhan there. | The **full** adhan recording is the channel sound (`res/raw/adhan_N.mp3`, channel `prayer_adhan_N_v1`). It stops when the notification is swiped away or tapped. Tapping does not replay it. |
+| صوت الجهاز | System default notification sound | Channel `prayer_default_v1` (device default sound) |
 
-### Register Device Body
-```json
-{
-  "token": "FCM_OR_APNS_TOKEN",
-  "platform": "android",
-  "deviceId": "UNIQUE_DEVICE_ID",
-  "enabledPrayers": ["fajr", "dhuhr", "asr", "maghrib", "isha"],
-  "muezzinId": "haram-ali-mulla",
-  "reminderMinutes": 10,
-  "locationLat": 21.3891,
-  "locationLng": 39.8579,
-  "locationName": "مكة المكرمة",
-  "calcMethod": "UmmAlQura",
-  "madhab": "Hanafi"
-}
-```
+- "تنبيه قبل الأذان" (5/10/15 min) adds an **extra** early alert with the device sound; the adhan alert stays at the prayer time. Before, the offset replaced the on-time alert.
+- Sounds follow the phone's silent switch / ringer mode, Focus / Do Not Disturb and notification volume. No critical alerts, time-sensitive entitlement, background audio mode, foreground service, full-screen intent or battery-optimisation exemption is used.
+- A full adhan **cannot** start by itself from a closed app on iOS: only the notification sound (≤ 30 s) plays. This is an iOS limit, not a bug.
+- Android channel sounds cannot be changed after creation. If a recording changes, give it a new channel ID (`_v2`) in both `NotificationChannels.java` and `src/lib/muezzins.ts`.
 
----
+## Scheduling
 
-## Android Setup
+- Times: `adhan` library, Umm al-Qura by default, standard (Shafi'i/Maliki/Hanbali) Asr by default, Hanafi selectable. Isha is 90 min after Maghrib and **120 min in Ramadan** (Umm al-Qura convention; the library leaves this to the app). The day is the device's calendar day; the library returns absolute instants, so no UTC+3 offset is assumed anywhere in native scheduling.
+- IDs: `1000 + (day number mod 90) × 10 + prayer index (+5 for the early alert)`. Scheduling the same prayer again replaces it. 1990 = refresh notice. Legacy test ID 1991 is removed on sync.
+- Window: 7 days. On iOS it shrinks to fit the 64-pending limit (5 days with early alerts on), keeping room for the 5 daily reminders.
+- Sync (`syncPrayerNotifications`): plans, cancels pending prayer IDs that are no longer wanted (location, madhab, method, prayers, sound, snooze or disable changed), and schedules only new or changed ones. Calls are queued so they never interleave.
+- A timed snooze skips alerts until it ends; "until manual resume" cancels them all.
+- Reboot: iOS keeps pending notifications. Android restores them from the plugin's storage (`LocalNotificationRestoreReceiver`); patched to drop alerts more than 10 minutes late.
+- App update: iOS keeps pending notifications. Whether Android keeps the alarms across an update has not been verified on a device; the app reschedules everything on its next start either way.
+- Without opening the app nothing can extend the window: on the last scheduled day a notice asks the user to open مصحفك.
 
-### 1. Firebase (required for remote push only)
-If you want server-side push notifications (not needed for local notifications):
+## Android exact alarms and battery
 
-1. Go to [Firebase Console](https://console.firebase.google.com)
-2. Create a project → Add Android app → package: `com.yahya.quran`
-3. Download `google-services.json`
-4. Place it at: `artifacts/quran/android/app/google-services.json`
-5. Add to `android/build.gradle`:
-   ```gradle
-   classpath 'com.google.gms:google-services:4.4.0'
-   ```
-6. Add to `android/app/build.gradle`:
-   ```gradle
-   apply plugin: 'com.google.gms.google-services'
-   ```
+- `SCHEDULE_EXACT_ALARM` is declared. On Android 14+ it is off by default for new installs; the Adhan settings screen shows "السماح بالتنبيه في الوقت الدقيق" and opens the system page. Without it alarms are inexact (allowed while idle) and may be several minutes late.
+- `USE_EXACT_ALARM` is not used (Play restricts it to alarm-clock and calendar apps).
+- Doze allows `setExactAndAllowWhileIdle`. Some manufacturers (for example Xiaomi, Huawei, Oppo) add their own battery killers; users may need to set the app to "unrestricted" battery use. The app does not request a battery-optimisation exemption (restricted on Play).
 
-### 2. Notification Channel (auto-created by Capacitor)
-Channel ID: `prayer-reminders`
-Channel name: **تنبيهات الصلاة**
-Channel description: **تنبيهات مواقيت الصلاة والأذان**
+## Patched dependency
 
-### 3. Custom Notification Sound
-Place `.mp3` or `.wav` files in:
-```
-artifacts/quran/android/app/src/main/res/raw/
-```
-Example: `prayer_tone.mp3`
+`patches/@capacitor__local-notifications@8.1.0.patch` (applied by `pnpm install`, Android code only):
+1. `LocalNotificationRestoreReceiver`: after boot, a one-time alert more than 10 min overdue is deleted instead of fired.
+2. `TimedNotificationPublisher`: repeating daily reminders are re-armed with `setExactAndAllowWhileIdle(RTC_WAKEUP)` instead of `setExact(RTC)`.
 
-Then reference in the notification schedule:
-```ts
-sound: "prayer_tone"  // without extension
-```
+When upgrading the plugin, check whether these are still needed and regenerate the patch.
 
-### 4. Permissions (already in AndroidManifest.xml)
-```xml
-<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-<uses-permission android:name="android.permission.VIBRATE" />
-<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-```
+## Diagnostics
 
-### 5. Android 13+ POST_NOTIFICATIONS
-Capacitor LocalNotifications handles the runtime permission request automatically when you call `requestPermissions()`.
+Adhan settings → "حالة التنبيهات" (native app only): notification permission, exact-alarm
+status (Android), device time zone, today's calculated times, and the pending prayer
+notifications with ID, scheduled time and prayer time. The production test-alert action has been removed. Coordinates are never shown or
+logged; development builds log only counts.
 
----
+## Must be verified on a real phone
 
-## iOS Setup
+Automated tests run the calculation and scheduling logic and the web UI. They cannot prove
+what the OS does. Check on a physical iPhone and Android phone:
 
-### 1. APNs Capability (required for remote push only)
-1. In Xcode: Project → Target (App) → Signing & Capabilities
-2. Click **+ Capability** → **Push Notifications**
-3. Also add **Background Modes** → check **Remote notifications**
-
-### 2. APNs Key (for server-side push)
-1. [Apple Developer Console](https://developer.apple.com) → Keys → Create key
-2. Enable **Apple Push Notifications service (APNs)**
-3. Download the `.p8` key file — store it as `APNS_KEY` environment variable (never commit it)
-
-### 3. Custom Notification Sound (iOS)
-Place `.aiff`, `.wav`, or `.caf` files in Xcode project:
-```
-artifacts/quran/ios/App/App/
-```
-Add them to the Xcode target (Build Phases → Copy Bundle Resources).
-
-### 4. Localized Permission Text (already in Info.plist)
-```xml
-<key>NSLocationWhenInUseUsageDescription</key>
-<string>يستخدم التطبيق موقعك لحساب مواقيت الصلاة بدقة حسب مكانك</string>
-```
-
-### 5. TestFlight Testing
-1. Archive the app in Xcode (Product → Archive)
-2. Upload to App Store Connect
-3. Add testers in TestFlight tab
-4. Testers install via TestFlight app
-5. Test notification permission → should prompt in Arabic
-
----
-
-## Required Environment Variables
-
-| Variable | Required For | Description |
-|---|---|---|
-| `VAPID_PUBLIC_KEY` | Web Push | VAPID public key |
-| `VAPID_PRIVATE_KEY` | Web Push | VAPID private key |
-| `VAPID_SUBJECT` | Web Push | mailto: or URL |
-| `DATABASE_URL` | Both | PostgreSQL connection |
-
-For local notifications, **no additional environment variables are needed** — everything runs on-device.
-
----
-
-## Database Tables
-
-### `device_tokens` (new)
-Stores native device tokens for server-side push (optional):
-```sql
-id, token, platform, device_id, enabled_prayers,
-muezzin_id, reminder_minutes, location_lat, location_lng,
-location_name, calc_method, madhab, created_at, updated_at
-```
-
-### `push_subscriptions` (existing)
-Web Push subscriptions (VAPID-based, for web users).
-
----
-
-## Testing Checklist
-
-### Browser / Replit Web Preview
-- [ ] Adhan page loads without errors
-- [ ] Prayer times calculate correctly with geolocation
-- [ ] Muezzin audio plays on tap (not autoplay)
-- [ ] Audio error shows "ملف الصوت غير متوفر حالياً" if file fails
-- [ ] Notification toggle shows browser Notification.requestPermission()
-- [ ] Reminder minutes selector saves to localStorage
-
-### Android Emulator / Device
-- [ ] `pnpm --filter @workspace/quran mobile:android` runs without error
-- [ ] Open in Android Studio → Run on emulator/device
-- [ ] App launches with splash screen (green #1a4731)
-- [ ] Prayer times work (emulator geolocation may need manual coords)
-- [ ] Tapping "تفعيل" requests POST_NOTIFICATIONS permission (Android 13+)
-- [ ] Notification appears at scheduled time
-- [ ] Notification dismisses correctly
-- [ ] Background notifications work
-
-### iOS TestFlight
-- [ ] CocoaPods install: `cd ios/App && pod install`
-- [ ] Archive and upload to TestFlight
-- [ ] Install via TestFlight
-- [ ] Permission dialog appears in Arabic
-- [ ] Local notification fires at correct prayer time
-- [ ] Notification sound plays
-
-### Permission Denied Case
-- [ ] App does not crash when permission is denied
-- [ ] Shows fallback message: "لم يتم منح إذن الإشعارات"
-- [ ] "تفعيل" button still visible to retry
-
-### Permission Granted Case
-- [ ] Notifications are scheduled for today + tomorrow
-- [ ] Schedule updates when prayer preferences change
-- [ ] Old schedule is cancelled before new one is created
-
-### Token Registration (if using remote push)
-- [ ] `POST /api/notifications/register-device` returns 200
-- [ ] No duplicate tokens in `device_tokens` table (upsert on conflict)
-- [ ] `DELETE /api/notifications/unregister-device` removes token
-
----
-
-## Known Platform Limitations
-
-| Limitation | Platform | Note |
-|---|---|---|
-| Full adhan audio in background | iOS | iOS kills background audio after ~30s; use short notification sounds |
-| Full adhan audio in background | Android | Works on most Android versions with `FOREGROUND_SERVICE` |
-| LocalNotifications in WebView | Web | Falls back to browser Notification API |
-| Notification scheduling limit | iOS | iOS may not fire notifications more than ~64 in the future |
-| Quiet hours (Focus/DND) | Both | System DND overrides app notifications |
-| Battery optimization | Android | Some OEM ROMs (Xiaomi, Huawei) kill background services |
-
-### Recommended for users experiencing missed notifications (Android)
-Tell them: Settings → Apps → القرآن الكريم → Battery → "Unrestricted"
-
----
-
-## App Store / Google Play Notes
-
-### Google Play
-- Notification permission: Declare usage in Play Console → App content
-- Target API 34+: `POST_NOTIFICATIONS` runtime permission handled by Capacitor
-
-### Apple App Store
-- Must declare notification usage in App Store Connect privacy questionnaire
-- No special entitlements needed for local notifications
-- For remote push: must add Push Notifications entitlement before submission
+1. A scheduled prayer notification plays the adhan clip (iOS) / full adhan (Android), screen locked and unlocked.
+2. "صوت الجهاز" plays the system sound (iOS relies on the plugin's documented fallback for the name `"default"`).
+3. Silent switch / Focus / DND silence it as expected; Bluetooth/headphones route as for any notification.
+4. A prayer alert arrives at the minute shown (Android: with and without exact-alarm permission, phone idle for an hour).
+5. Tapping a prayer alert on iOS opens the Prayer tab and plays the full adhan once; on Android it opens the tab without replaying.
+6. Reboot the phone: no burst of old alerts; the next prayer still fires.
+7. Install the update over the current TestFlight build: bookmarks, khatmah, tasbeeh and prayer settings are all still there.

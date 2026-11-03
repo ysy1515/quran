@@ -1,6 +1,6 @@
 export const APP_CONFIG = {
   website: "https://quran.yahya.app",
-  iosAppStoreUrl: "",
+  iosAppStoreUrl: "https://apps.apple.com/app/id6767634410",
   androidPlayStoreUrl: "",
   /**
    * Public support address, shown as a mailto link on /support and /privacy.

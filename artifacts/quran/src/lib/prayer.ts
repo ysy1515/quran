@@ -1,6 +1,7 @@
 import * as adhan from "adhan";
 import { createLocalStore, useLocalStore } from "./localStore";
 import { ADHAN_PREFS_VERSION, DEFAULT_MADHAB, migrateAdhanPrefs } from "./adhanPrefs";
+import { DEFAULT_MUEZZIN_ID } from "./muezzins";
 
 // Shared prayer-time state for the Prayer screen and its settings screen. The
 // storage keys and formats are the ones the Adhan page always used.
@@ -13,17 +14,42 @@ export interface AdhanPrefs {
   calcMethod: string;
   madhab: string;
   reminderMinutes: number;
+  /**
+   * Sound of the prayer notification: "adhan" plays the selected muezzin (a 29 s
+   * clip on iOS, the full recording on Android), "device" the phone's default
+   * notification sound.
+   */
+  alertSound: AlertSound;
   prefsVersion?: number;
 }
 
+export type AlertSound = "adhan" | "device";
+
+export const CALC_METHOD_IDS = [
+  "UmmAlQura",
+  "MuslimWorldLeague",
+  "Egyptian",
+  "Karachi",
+  "NorthAmerica",
+  "Dubai",
+  "Kuwait",
+  "Qatar",
+  "Singapore",
+  "Turkey",
+] as const;
+
+export const REMINDER_MINUTE_OPTIONS = [0, 5, 10, 15] as const;
+const NOTIFIABLE_PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+
 export const DEFAULT_ADHAN_PREFS: AdhanPrefs = {
   enabled: false,
-  muezzinId: "adhan-1",
+  muezzinId: DEFAULT_MUEZZIN_ID,
   enabledPrayers: ["fajr", "dhuhr", "asr", "maghrib", "isha"],
   snoozedUntil: null,
   calcMethod: "UmmAlQura",
   madhab: DEFAULT_MADHAB,
   reminderMinutes: 0,
+  alertSound: "adhan",
   prefsVersion: ADHAN_PREFS_VERSION,
 };
 
@@ -31,6 +57,15 @@ export function parseAdhanPrefs(raw: unknown): AdhanPrefs | null {
   if (typeof raw !== "object" || raw === null) return null;
   const merged = migrateAdhanPrefs<AdhanPrefs>(raw as Partial<AdhanPrefs>, DEFAULT_ADHAN_PREFS);
   if (!Array.isArray(merged.enabledPrayers)) merged.enabledPrayers = [...DEFAULT_ADHAN_PREFS.enabledPrayers];
+  else merged.enabledPrayers = merged.enabledPrayers.filter((k) => NOTIFIABLE_PRAYERS.includes(k));
+  // Malformed fields fall back to their defaults; valid saved choices are kept as they are.
+  if (typeof merged.enabled !== "boolean") merged.enabled = DEFAULT_ADHAN_PREFS.enabled;
+  if (typeof merged.muezzinId !== "string") merged.muezzinId = DEFAULT_ADHAN_PREFS.muezzinId;
+  if (!(CALC_METHOD_IDS as readonly string[]).includes(merged.calcMethod)) merged.calcMethod = DEFAULT_ADHAN_PREFS.calcMethod;
+  if (merged.madhab !== "Hanafi") merged.madhab = "Shafi";
+  if (!(REMINDER_MINUTE_OPTIONS as readonly number[]).includes(merged.reminderMinutes)) merged.reminderMinutes = 0;
+  if (merged.alertSound !== "device") merged.alertSound = "adhan";
+  if (merged.snoozedUntil !== null && typeof merged.snoozedUntil !== "number") merged.snoozedUntil = null;
   return merged;
 }
 
@@ -86,15 +121,42 @@ export interface PrayerTime {
   time: Date;
 }
 
-function calcParams(method: string, madhab: string): adhan.CalculationParameters {
+/** Umm al-Qura month (1–12) of the local calendar day of `date`, or null if the runtime lacks the calendar. */
+export function umAlQuraMonth(date: Date): number | null {
+  try {
+    const parts = new Intl.DateTimeFormat("en-u-ca-islamic-umalqura-nu-latn", { month: "numeric" }).formatToParts(date);
+    const m = Number(parts.find((p) => p.type === "month")?.value);
+    return Number.isInteger(m) && m >= 1 && m <= 12 ? m : null;
+  } catch {
+    return null;
+  }
+}
+
+export function calcParams(method: string, madhab: string, date?: Date): adhan.CalculationParameters {
   const m = adhan.CalculationMethod as Record<string, (() => adhan.CalculationParameters) | undefined>;
-  const params = m[method]?.() ?? adhan.CalculationMethod.UmmAlQura();
+  const known = (CALC_METHOD_IDS as readonly string[]).includes(method);
+  const params = (known ? m[method]?.() : undefined) ?? adhan.CalculationMethod.UmmAlQura();
   params.madhab = madhab === "Hanafi" ? adhan.Madhab.Hanafi : adhan.Madhab.Shafi;
+  // Umm al-Qura sets Isha 90 minutes after Maghrib, and 120 minutes during Ramadan.
+  // The adhan library leaves the Ramadan rule to the app (its docs recommend +30).
+  if (params.method === "UmmAlQura" && date && umAlQuraMonth(date) === 9) params.ishaInterval = 120;
   return params;
 }
 
+/** Noon of the same local calendar day, so date arithmetic never lands on the wrong day across DST changes. */
+export function localNoon(date: Date, addDays = 0): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + addDays, 12, 0, 0, 0);
+}
+
+/**
+ * Prayer times for the local calendar day of `date`. The adhan library takes the
+ * day's year/month/day and the coordinates, and returns absolute instants (Date),
+ * so no time-zone offset is assumed anywhere: the device clock shows them in its
+ * own zone.
+ */
 export function prayerTimesFor(coords: Coords, date: Date, prefs: Pick<AdhanPrefs, "calcMethod" | "madhab">): PrayerTime[] {
-  const pt = new adhan.PrayerTimes(new adhan.Coordinates(coords.lat, coords.lng), date, calcParams(prefs.calcMethod, prefs.madhab));
+  const day = localNoon(date);
+  const pt = new adhan.PrayerTimes(new adhan.Coordinates(coords.lat, coords.lng), day, calcParams(prefs.calcMethod, prefs.madhab, day));
   return PRAYER_KEYS.map((key) => ({ key, label: PRAYER_LABEL[key], time: pt[key] }));
 }
 
@@ -102,9 +164,7 @@ export function prayerTimesFor(coords: Coords, date: Date, prefs: Pick<AdhanPref
 export function nextPrayer(coords: Coords, now: Date, prefs: Pick<AdhanPrefs, "calcMethod" | "madhab">): PrayerTime {
   const today = prayerTimesFor(coords, now, prefs).filter((p) => p.key !== "sunrise" && p.time > now);
   if (today.length) return today[0]!;
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return prayerTimesFor(coords, tomorrow, prefs)[0]!;
+  return prayerTimesFor(coords, localNoon(now, 1), prefs)[0]!;
 }
 
 export async function lookupPlaceName(c: Coords): Promise<string> {
@@ -114,11 +174,17 @@ export async function lookupPlaceName(c: Coords): Promise<string> {
     );
     const d = await r.json();
     const name = d.address?.city || d.address?.town || d.address?.village || d.address?.county || d.address?.state || "";
-    if (name) placeStore.set(String(name).slice(0, 120));
+    if (name && coordsStore.get()?.lat === c.lat && coordsStore.get()?.lng === c.lng) placeStore.set(String(name).slice(0, 120));
     return name;
   } catch {
     return "";
   }
+}
+
+/** Sets the location by hand (city list), without GPS or network. */
+export function setManualLocation(c: Coords, name: string) {
+  coordsStore.set({ lat: c.lat, lng: c.lng });
+  placeStore.set(name.slice(0, 120));
 }
 
 export function requestLocation(): Promise<Coords> {
@@ -129,13 +195,19 @@ export function requestLocation(): Promise<Coords> {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const c = parseCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        if (!c || !Number.isFinite(pos.coords.accuracy) || pos.coords.accuracy < 0 || pos.coords.accuracy > 1000) {
+          reject(new Error("inaccurate-location"));
+          return;
+        }
         coordsStore.set(c);
+        // The old name belongs to the old coordinates; clear it so an offline lookup never leaves a wrong city.
+        placeStore.set("");
         void lookupPlaceName(c);
         resolve(c);
       },
       (err) => reject(err),
-      { enableHighAccuracy: false, timeout: 10000 },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
     );
   });
 }

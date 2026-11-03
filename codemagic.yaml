@@ -126,7 +126,7 @@ workflows:
 
           cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
 
-          APP_VERSION="1.0.4"
+          APP_VERSION="1.0.5"
 
           # CM_BUILD_NUMBER is not one of Codemagic's built-in variables, so the
           # previous fallback could produce 12 on every build. Use the next number
@@ -322,7 +322,7 @@ workflows:
 
           cd "$CM_BUILD_DIR/artifacts/quran/ios/App"
 
-          APP_VERSION="1.0.4"
+          APP_VERSION="1.0.5"
 
           # CM_BUILD_NUMBER is not one of Codemagic's built-in variables, so the
           # previous fallback could produce 12 on every build. Use the next number
@@ -393,3 +393,125 @@ workflows:
       - /tmp/xcodebuild_logs/*.log
       - artifacts/quran/ios/App/DerivedData/**/Build/**/*.app
       - artifacts/quran/ios/App/DerivedData/**/Build/**/*.dSYM
+
+  # ---------------------------------------------------------------------------
+  # Android. The two iOS workflows above are unchanged. Both Android workflows
+  # run only when started by hand in Codemagic (no triggering section).
+  # ---------------------------------------------------------------------------
+
+  # Verify-only: builds the release Android App Bundle without signing and
+  # without uploading anywhere. Needs no secrets.
+  android-verify-build:
+    name: Android Verify Build (no upload)
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    environment:
+      node: 22
+      java: 21
+      vars:
+        ANDROID_VERSION_NAME: "1.0.5"
+
+    scripts:
+      - name: Install workspace dependencies
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
+          corepack disable || true
+          npm install -g pnpm@10.26.1
+          pnpm install --frozen-lockfile
+
+      - name: Typecheck and unit tests
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
+          pnpm run typecheck
+          pnpm --filter @workspace/quran test
+
+      - name: Build mobile web app and sync Capacitor Android
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR/artifacts/quran"
+          pnpm build:mobile
+          npx cap sync android
+
+      - name: Build release App Bundle (unsigned)
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR/artifacts/quran/android"
+          echo "ANDROID_VERSION_CODE=$BUILD_NUMBER" >> "$CM_ENV"
+          ANDROID_VERSION_CODE="$BUILD_NUMBER" ./gradlew --no-daemon clean bundleRelease
+          ls -la app/build/outputs/bundle/release
+
+    artifacts:
+      - artifacts/quran/android/app/build/outputs/bundle/release/*.aab
+
+  # Signed release bundle for Google Play. Needs the upload keystore in Codemagic
+  # (Team settings > Code signing identities > Android keystores) under the
+  # reference name "mushafak_upload_keystore". It builds the signed .aab as a
+  # build artifact and uploads nothing: the bundle is uploaded to Play Console
+  # by hand (the first upload of a new app has to be manual anyway).
+  android-release:
+    name: Android Release (signed AAB, no upload)
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    environment:
+      node: 22
+      java: 21
+      android_signing:
+        - mushafak_upload_keystore
+      vars:
+        PACKAGE_NAME: "com.yahya.quran"
+        ANDROID_VERSION_NAME: "1.0.5"
+
+    scripts:
+      - name: Install workspace dependencies
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
+          corepack disable || true
+          npm install -g pnpm@10.26.1
+          pnpm install --frozen-lockfile
+
+      - name: Typecheck and unit tests
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
+          pnpm run typecheck
+          pnpm --filter @workspace/quran test
+
+      - name: Build mobile web app and sync Capacitor Android
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR/artifacts/quran"
+          pnpm build:mobile
+          npx cap sync android
+
+      - name: Choose version code
+        script: |
+          set -euo pipefail
+          # Codemagic's build counter for this workflow only grows. If a Play
+          # service account is ever added (GCLOUD_SERVICE_ACCOUNT_CREDENTIALS), the
+          # next number after the highest one on Google Play is used when larger.
+          LATEST=0
+          if [ -n "${GCLOUD_SERVICE_ACCOUNT_CREDENTIALS:-}" ]; then
+            LATEST="$(google-play get-latest-build-number --package-name "$PACKAGE_NAME" 2>/dev/null || echo 0)"
+          fi
+          case "$LATEST" in ""|*[!0-9]*) LATEST=0 ;; esac
+          NEXT=$((LATEST + 1))
+          if [ "$BUILD_NUMBER" -gt "$NEXT" ]; then NEXT="$BUILD_NUMBER"; fi
+          echo "Latest on Google Play: $LATEST; using versionCode $NEXT, versionName $ANDROID_VERSION_NAME"
+          echo "ANDROID_VERSION_CODE=$NEXT" >> "$CM_ENV"
+
+      - name: Build signed release App Bundle
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR/artifacts/quran/android"
+          test -n "${CM_KEYSTORE_PATH:-}" || { echo "Upload keystore not configured in Codemagic" >&2; exit 1; }
+          ./gradlew --no-daemon clean bundleRelease
+          ls -la app/build/outputs/bundle/release
+
+    artifacts:
+      - artifacts/quran/android/app/build/outputs/bundle/release/*.aab
+      - artifacts/quran/android/app/build/outputs/mapping/release/mapping.txt

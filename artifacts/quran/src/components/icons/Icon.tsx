@@ -4,6 +4,12 @@ import type { SVGProps } from "react";
 // Feature artwork (large tiles) lives in components/art instead.
 
 const paths = {
+  kaaba: (
+    <>
+      <path d="M3 7l9-4 9 4v13H3zM3 7l9 4 9-4M12 11v9" />
+      <path d="M3 10l9 4 9-4M15 20v-4l3-1v5" />
+    </>
+  ),
   book: (
     <>
       <path d="M12 6.5C10.2 5 7.6 4.3 4 4.5v13c3.6-.2 6.2.5 8 2 1.8-1.5 4.4-2.2 8-2v-13c-3.6-.2-6.2.5-8 2z" />

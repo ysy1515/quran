@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Screen from "@/components/shell/Screen";
 import { BrandLockup } from "@/components/brand/Brand";
@@ -6,7 +7,7 @@ import { useKhatmah } from "@/lib/khatmah";
 import { useBookmarks, useFavorites } from "@/lib/bookmarks";
 import { useReadingProgress } from "@/lib/userData";
 import { useReadingTime } from "@/lib/readingTime";
-import { REMINDER_TEXT, remindersSupported, setReminder, useReminders, type ReminderId } from "@/lib/reminders";
+import { REMINDER_TEXT, remindersStore, remindersSupported, setReminder, useReminders, type ReminderId, type ReminderResult } from "@/lib/reminders";
 import { useDhikrState } from "@/lib/dhikr";
 import { rateApp, shareApp } from "@/lib/appActions";
 import { ayahCount, surahName } from "@workspace/quran-meta";
@@ -16,6 +17,14 @@ import { readerHref } from "@/lib/useQuranLinks";
 /** The quick list of the last ten surahs from the previous home screen, An-Nas first. */
 const SHORT_SURAHS = Array.from({ length: 10 }, (_, i) => 114 - i);
 
+const REMINDER_ERROR: Record<Exclude<ReminderResult, "ok">, string> = {
+  denied: "لم يتم منح إذن الإشعارات، يرجى السماح من إعدادات الجهاز",
+  unsupported: "أنت تستخدم نسخة المتصفح. افتح التطبيق المثبت من TestFlight أو المتجر لتفعيل التذكيرات اليومية.",
+  unavailable: "خدمة الإشعارات غير موجودة في هذه النسخة. حدّث التطبيق من TestFlight.",
+  timeout: "لم تستجب خدمة الإشعارات. أعد فتح التطبيق ثم حاول مرة أخرى.",
+  error: "تعذّر حفظ التذكير، حاول مرة أخرى",
+};
+
 function Badge({ children }: { children: React.ReactNode }) {
   return <span className="badge-count">{children}</span>;
 }
@@ -24,11 +33,42 @@ function ReminderRow({ id, label, hint }: { id: ReminderId; label: string; hint?
   const reminders = useReminders();
   const r = reminders[id];
   const supported = remindersSupported();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // The time picker edits a local draft. iOS fires "change" on every turn of the wheel;
+  // saving each one (and disabling the input meanwhile) closed the picker and snapped the
+  // time back. The draft is saved once, when the picker closes or after a short pause.
+  const [draft, setDraft] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const savingTime = useRef<string | null>(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   const apply = async (patch: { on?: boolean; time?: string }) => {
-    const res = await setReminder(id, patch);
-    if (res === "denied") toast.error("لم يتم منح إذن الإشعارات، يرجى السماح من إعدادات الجهاز");
-    else if (res === "ok" && patch.on) toast.success(`سيصلك تذكير ${REMINDER_TEXT[id].title} يوميًا`);
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await setReminder(id, patch);
+      if (res !== "ok") {
+        setError(REMINDER_ERROR[res]);
+        toast.error(REMINDER_ERROR[res]);
+      }
+      else if (res === "ok" && patch.on) toast.success(`سيصلك تذكير ${REMINDER_TEXT[id].title} يوميًا`);
+      else if (res === "ok" && patch.time) toast.success(`تم ضبط ${REMINDER_TEXT[id].title} على ${patch.time}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Keeps showing the new time while it is saved; on failure it returns to the saved one.
+  const saveTime = (t: string) => {
+    clearTimeout(timer.current);
+    if (t === remindersStore.get()[id].time) return setDraft(null);
+    if (savingTime.current === t) return;
+    savingTime.current = t;
+    void apply({ time: t }).finally(() => {
+      savingTime.current = null;
+      setDraft((d) => (d === t ? null : d));
+    });
   };
 
   return (
@@ -36,18 +76,28 @@ function ReminderRow({ id, label, hint }: { id: ReminderId; label: string; hint?
       <span className="list-row__body">
         <span className="list-row__label block">{label}</span>
         {hint && <span className="list-row__hint block">{hint}</span>}
+        <span className="list-row__hint block" role="status">
+          {saving ? "جاري الحفظ…" : error ? error : !supported ? "يتطلب تطبيق الجوال" : r.on ? "مفعّل" : "غير مفعّل"}
+        </span>
       </span>
       {r.on && supported && (
         <input
           type="time"
-          value={r.time}
-          onChange={(e) => e.target.value && void apply({ time: e.target.value })}
+          value={draft ?? r.time}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (!v) return;
+            setDraft(v);
+            clearTimeout(timer.current);
+            timer.current = setTimeout(() => saveTime(v), 1500);
+          }}
+          onBlur={() => draft && saveTime(draft)}
           className="time-value"
           aria-label={`وقت ${label}`}
           dir="ltr"
         />
       )}
-      <Switch checked={r.on && supported} onChange={(v) => void apply({ on: v })} label={label} disabled={!supported} />
+      <Switch checked={r.on && supported} onChange={(v) => void apply({ on: v })} label={label} disabled={!supported || saving} />
     </div>
   );
 }
@@ -61,7 +111,7 @@ export default function More() {
   const dhikr = useDhikrState();
   const supported = remindersSupported();
   const { fullCount, partialCount, lastFull } = k.stats;
-  const webNote = supported ? undefined : "التذكيرات اليومية متاحة في تطبيق الآيفون.";
+  const webNote = supported ? "تُجدول هذه التنبيهات على جهازك. يمكنك مراجعة أوقاتها من إعدادات الأذان ← حالة التنبيهات ← عرض التنبيهات المجدولة." : REMINDER_ERROR.unsupported;
 
   return (
     <Screen title="المزيد">
@@ -108,6 +158,7 @@ export default function More() {
 
         <ListSection title="الإعدادات">
           <ListRow icon="palette" href="/settings" label="المظهر والقراءة" hint="الوضع الليلي، حجم الخط، التفسير" />
+          <ListRow icon="mosque" href="/qibla" label="القبلة" hint="اتجاه الكعبة من موقعك" />
           <ListRow icon="mosque" href="/adhan/settings" label="إعدادات الأذان" hint="الموقع، الصوت، طريقة الحساب" />
           <ListRow icon="beads" href="/dhikr" label="التسبيح" value={dhikr.count ? <Badge>{ar(dhikr.count)}</Badge> : undefined} />
         </ListSection>

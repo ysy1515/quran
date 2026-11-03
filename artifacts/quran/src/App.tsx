@@ -16,6 +16,7 @@ import Settings from "@/pages/Settings";
 import About from "@/pages/About";
 import More from "@/pages/More";
 import Dhikr from "@/pages/Dhikr";
+import Qibla from "@/pages/Qibla";
 import Adhan from "@/pages/Adhan";
 import AdhanSettings from "@/pages/AdhanSettings";
 import Athkar from "@/pages/Athkar";
@@ -60,6 +61,7 @@ function Router() {
         <Route path="/about" component={About} />
         <Route path="/dhikr" component={Dhikr} />
         <Route path="/adhan" component={Adhan} />
+        <Route path="/qibla" component={Qibla} />
         <Route path="/adhan/settings" component={AdhanSettings} />
         <Route path="/athkar" component={Athkar} />
         <Route path="/athkar/:id" component={AthkarCategory} />

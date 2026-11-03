@@ -1,5 +1,25 @@
 apply plugin: 'com.android.application'
 
+// Release signing. Nothing secret is stored in the repository:
+// - on Codemagic, the keystore uploaded under Team settings > Code signing identities is
+//   decoded by the android_signing step, which sets the CM_KEYSTORE_* variables below;
+// - locally, an untracked android/keystore.properties may hold the same four values
+//   (storeFile, storePassword, keyAlias, keyPassword). *.jks/*.keystore are git-ignored.
+def keystoreProps = new Properties()
+def keystorePropsFile = rootProject.file('keystore.properties')
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+def signingValue = { String envName, String propName ->
+    System.getenv(envName) ?: keystoreProps.getProperty(propName)
+}
+def releaseStoreFile = signingValue('CM_KEYSTORE_PATH', 'storeFile')
+
+// Version: versionCode must grow with every upload to Google Play. Codemagic passes it
+// in ANDROID_VERSION_CODE (see codemagic.yaml); local builds fall back to 1.
+def appVersionCode = (System.getenv('ANDROID_VERSION_CODE') ?: '1') as Integer
+def appVersionName = System.getenv('ANDROID_VERSION_NAME') ?: '1.0.5'
+
 android {
     namespace = "com.yahya.quran"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +27,8 @@ android {
         applicationId "com.yahya.quran"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +36,22 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (releaseStoreFile) {
+                storeFile file(releaseStoreFile)
+                storePassword signingValue('CM_KEYSTORE_PASSWORD', 'storePassword')
+                keyAlias signingValue('CM_KEY_ALIAS', 'keyAlias')
+                keyPassword signingValue('CM_KEY_PASSWORD', 'keyPassword')
+            }
+        }
+    }
     buildTypes {
         release {
+            // Unsigned when no keystore is configured (CI verify builds); Play only accepts signed bundles.
+            if (releaseStoreFile) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

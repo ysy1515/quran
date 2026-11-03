@@ -1,20 +1,35 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import Screen from "@/components/shell/Screen";
 import { ListSection, ListRow, Segmented, Switch } from "@/components/kit/List";
 import Sheet from "@/components/kit/Sheet";
 import { Icon } from "@/components/icons/Icon";
 import { useLocalNotifications } from "@/hooks/useLocalNotifications";
-import { isSnoozed, requestLocation, updateAdhanPrefs, useAdhanPrefs, useCoords, usePlace } from "@/lib/prayer";
-import { ar } from "@/lib/format";
-
-// Only the 5 MP3 files actually uploaded to public/audio/adhan/
-const MUEZZINS = [1, 2, 3, 4, 5].map((n) => ({
-  id: `adhan-${n}`,
-  name: `أذان ${ar(n)}`,
-  hint: ["النمط الأول", "النمط الثاني", "النمط الثالث", "النمط الرابع", "النمط الخامس"][n - 1]!,
-  audioUrl: `/audio/adhan/adhan-${n}.mp3`,
-}));
+import {
+  isSnoozed,
+  prayerTimesFor,
+  PRAYER_LABEL,
+  requestLocation,
+  setManualLocation,
+  updateAdhanPrefs,
+  useAdhanPrefs,
+  useCoords,
+  usePlace,
+  type AlertSound,
+  type PrayerKey,
+} from "@/lib/prayer";
+import { ar, clock } from "@/lib/format";
+import { getCapacitorPlatform, isCapacitorNative } from "@/lib/appConfig";
+import { MUEZZINS } from "@/lib/muezzins";
+import { SAUDI_CITIES } from "@/lib/cities";
+import { playAdhan, stopAdhan, useAdhanPlayer } from "@/lib/adhanPlayer";
+import {
+  checkExactAlarm,
+  openExactAlarmSettings,
+  pendingNotifications,
+  syncPrayerNotifications,
+  type PendingOverview,
+} from "@/lib/prayerNotifications";
 
 const CALC_METHODS: { id: string; label: string }[] = [
   { id: "UmmAlQura", label: "أم القرى — السعودية" },
@@ -42,39 +57,59 @@ function snoozeLabel(until: number | null): string {
   return `موقوف حتى ${new Date(until).toLocaleDateString("ar-SA", { weekday: "long", month: "short", day: "numeric" })}`;
 }
 
+function timeLabel(d: Date | null): string {
+  if (!d) return "—";
+  const c = clock(d);
+  return `${d.toLocaleDateString("ar", { weekday: "short", day: "numeric", month: "numeric" })} ${c.time} ${c.period}`;
+}
+
+const SOUND_FOOTER: Record<"ios" | "android" | "web", Record<AlertSound, string>> = {
+  ios: {
+    adhan: "يُشغَّل مع الإشعار مقطع من بداية الأذان مدته ٢٩ ثانية (أقصى مدة يسمح بها iOS لصوت الإشعار). اضغط على الإشعار لسماع الأذان كاملًا داخل التطبيق.",
+    device: "يُشغَّل صوت الإشعار الافتراضي في جهازك.",
+  },
+  android: {
+    adhan: "يُشغَّل الأذان كاملًا بصوت المؤذن المختار مع الإشعار، ويتوقف عند إزالة الإشعار أو الضغط عليه.",
+    device: "يُشغَّل صوت الإشعار الافتراضي في جهازك.",
+  },
+  web: {
+    adhan: "تنبيهات الأذان بالصوت متاحة في تطبيق الجوال.",
+    device: "تنبيهات الأذان بالصوت متاحة في تطبيق الجوال.",
+  },
+};
+
 export default function AdhanSettings() {
   const prefs = useAdhanPrefs();
   const coords = useCoords();
   const place = usePlace();
-  const { permission, requestPermission, cancelAllPrayer } = useLocalNotifications();
+  const { permission, requestPermission, checkPermission, cancelAllPrayer } = useLocalNotifications();
+  const player = useAdhanPlayer();
   const [locLoading, setLocLoading] = useState(false);
   const [snoozeOpen, setSnoozeOpen] = useState(false);
-  const [playing, setPlaying] = useState<string | null>(null);
-  const audio = useRef<HTMLAudioElement | null>(null);
+  const [cityOpen, setCityOpen] = useState(false);
+  const [exact, setExact] = useState<"granted" | "denied" | "unsupported">("unsupported");
+  const [diag, setDiag] = useState<PendingOverview | null>(null);
   const snoozed = isSnoozed(prefs.snoozedUntil);
+  const platform = getCapacitorPlatform();
+  const native = isCapacitorNative();
 
-  const stopAudio = () => {
-    audio.current?.pause();
-    if (audio.current) audio.current.src = "";
-    setPlaying(null);
-  };
-  useEffect(() => () => stopAudio(), []);
+  useEffect(() => () => stopAdhan(), []);
 
-  const preview = (id: string, url: string) => {
-    if (playing === id) return stopAudio();
-    stopAudio();
-    const a = new Audio(url);
-    audio.current = a;
-    a.onended = () => setPlaying(null);
-    a.onerror = () => {
-      setPlaying(null);
-      toast.error("تعذّر تشغيل الأذان، يرجى المحاولة لاحقاً");
-    };
-    setPlaying(id);
-    a.play().catch((err: unknown) => {
-      setPlaying(null);
-      if (!(err instanceof DOMException && err.name === "AbortError")) toast.error("ملف الأذان غير متوفر حالياً");
-    });
+  const refreshStatus = useCallback(async () => {
+    setExact(await checkExactAlarm());
+    await checkPermission();
+  }, [checkPermission]);
+
+  useEffect(() => {
+    void refreshStatus();
+    const onVisible = () => document.visibilityState === "visible" && void refreshStatus();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refreshStatus]);
+
+  const preview = async (id: string, url: string) => {
+    if (player.playing === id) return stopAdhan();
+    if (!(await playAdhan(id, url))) toast.error("تعذّر تشغيل ملف الأذان");
   };
 
   const locate = async () => {
@@ -82,9 +117,15 @@ export default function AdhanSettings() {
     try {
       await requestLocation();
       toast.success("تم تحديد الموقع");
+      return true;
     } catch (err) {
       const denied = (err as GeolocationPositionError)?.code === 1;
-      toast.error(denied ? "تم رفض الوصول إلى الموقع، يرجى السماح من الإعدادات" : "تعذّر تحديد الموقع");
+      if (err instanceof Error && err.message === "inaccurate-location") {
+        toast.error("الموقع التقريبي غير كافٍ. فعّل الموقع الدقيق في إعدادات الجهاز ثم حاول مجددًا.");
+        return false;
+      }
+      toast.error(denied ? "تم رفض الوصول إلى الموقع، يمكنك السماح من الإعدادات أو اختيار مدينتك" : "تعذّر تحديد الموقع، يمكنك اختيار مدينتك من القائمة");
+      return false;
     } finally {
       setLocLoading(false);
     }
@@ -94,19 +135,16 @@ export default function AdhanSettings() {
     if (!on) {
       updateAdhanPrefs({ enabled: false });
       await cancelAllPrayer();
-      toast("تم إيقاف تذكيرات الصلاة");
+      toast("تم إيقاف تنبيهات الأذان");
       return;
     }
-    if (!coords) {
-      await locate();
-      return;
-    }
+    if (!coords && !(await locate())) return;
     if (!(await requestPermission())) {
       toast.error("لم يتم منح إذن الإشعارات، يرجى السماح من إعدادات الجهاز");
       return;
     }
     updateAdhanPrefs({ enabled: true, snoozedUntil: null });
-    toast.success("تم تفعيل تذكيرات الصلاة");
+    toast.success("تم تفعيل تنبيهات الأذان");
   };
 
   const snooze = (days: number | "forever") => {
@@ -115,10 +153,30 @@ export default function AdhanSettings() {
     toast.success(days === "forever" ? "تم إيقاف الأذان حتى التفعيل اليدوي" : `تم إيقاف الأذان ${ar(days)} أيام`);
   };
 
+  const loadDiagnostics = async () => {
+    if (coords) await syncPrayerNotifications(coords, prefs);
+    setDiag(await pendingNotifications());
+    await refreshStatus();
+  };
+
+  const permissionLabel =
+    permission === "granted" ? "مسموح" : permission === "denied" ? "مرفوض" : permission === "unsupported" ? "غير مدعوم" : "لم يُطلب بعد";
+  const today = coords ? prayerTimesFor(coords, new Date(), prefs).filter((p) => p.key !== "sunrise") : [];
+  const timeZone = (() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      return "";
+    }
+  })();
+
   return (
     <Screen title="إعدادات الأذان" back="/adhan">
       <div className="screen__inner pb-10">
-        <ListSection title="الموقع" footer="يُحسب الأذان باستخدام موقعك الجغرافي وفق الطريقة المختارة، ويعمل بدون اتصال بالإنترنت بعد تحديد الموقع.">
+        <ListSection
+          title="الموقع"
+          footer="تُحسب المواقيت على جهازك من موقعك وطريقة الحساب المختارة، وتعمل بدون إنترنت بعد تحديد الموقع. إذا انتقلت إلى مدينة أخرى فحدّث الموقع."
+        >
           <ListRow
             icon="location"
             label="موقعك الحالي"
@@ -129,15 +187,16 @@ export default function AdhanSettings() {
               </button>
             }
           />
+          <ListRow icon="list" label="اختيار المدينة يدويًا" hint="بدون GPS — مدن المملكة" onClick={() => setCityOpen(true)} testId="choose-city" />
         </ListSection>
 
         <ListSection title="تنبيه الأذان">
           <ListRow
             icon="bell"
             gold
-            label="تذكير الأذان"
-            hint={snoozed ? snoozeLabel(prefs.snoozedUntil) : prefs.enabled ? "مفعّل" : "غير مفعّل"}
-            trailing={<Switch checked={prefs.enabled} onChange={(v) => void setEnabled(v)} label="تذكير الأذان" testId="adhan-enabled" />}
+            label="تنبيهات الأذان"
+            hint={snoozed ? snoozeLabel(prefs.snoozedUntil) : prefs.enabled ? "مفعّلة" : "غير مفعّلة"}
+            trailing={<Switch checked={prefs.enabled} onChange={(v) => void setEnabled(v)} label="تنبيهات الأذان" testId="adhan-enabled" />}
           />
           {prefs.enabled &&
             (snoozed ? (
@@ -145,27 +204,55 @@ export default function AdhanSettings() {
             ) : (
               <ListRow icon="bellOff" label="إيقاف مؤقت" onClick={() => setSnoozeOpen(true)} testId="adhan-snooze" />
             ))}
+          {platform === "android" && exact === "denied" && prefs.enabled && (
+            <ListRow
+              icon="clock"
+              gold
+              label="السماح بالتنبيه في الوقت الدقيق"
+              hint="بدونه قد يؤخّر أندرويد تنبيه الأذان عدة دقائق"
+              onClick={() => void openExactAlarmSettings()}
+              testId="exact-alarm"
+            />
+          )}
         </ListSection>
         {permission === "denied" && (
           <p className="px-5 -mt-1 text-xs text-destructive">تم رفض إذن الإشعارات، افتح إعدادات الجهاز وأعد السماح.</p>
         )}
 
         {prefs.enabled && (
-          <ListSection title="وقت التذكير" footer="قد يختلف صوت الإشعار حسب قيود iOS، والصوت الافتراضي للجهاز هو الأكثر موثوقية.">
+          <ListSection title="تنبيه قبل الأذان" footer="تنبيه إضافي بصوت الجهاز قبل الأذان بالمدة المختارة، ويبقى تنبيه الأذان في وقته.">
             <div className="px-4 py-3">
               <Segmented
-                label="أرسل التنبيه قبل وقت الصلاة"
+                label="تنبيه قبل الأذان"
                 value={String(prefs.reminderMinutes)}
                 onChange={(v) => updateAdhanPrefs({ reminderMinutes: Number(v) })}
-                options={[0, 5, 10, 15].map((m) => ({ value: String(m), label: m === 0 ? "عند الأذان" : `${ar(m)} د` }))}
+                options={[0, 5, 10, 15].map((m) => ({ value: String(m), label: m === 0 ? "بدون" : `${ar(m)} د` }))}
               />
             </div>
           </ListSection>
         )}
 
-        <ListSection title="صوت الأذان">
+        <ListSection
+          title="صوت التنبيه"
+          footer={`${SOUND_FOOTER[platform][prefs.alertSound]} يتبع الصوت إعدادات جهازك: الوضع الصامت ووضع التركيز (عدم الإزعاج) ومستوى الصوت.`}
+        >
+          <div className="px-4 py-3">
+            <Segmented<AlertSound>
+              label="صوت التنبيه"
+              value={prefs.alertSound}
+              onChange={(v) => updateAdhanPrefs({ alertSound: v })}
+              options={[
+                { value: "adhan", label: "الأذان" },
+                { value: "device", label: "صوت الجهاز" },
+              ]}
+            />
+          </div>
+        </ListSection>
+
+        <ListSection title="المؤذن">
           {MUEZZINS.map((m) => {
             const selected = prefs.muezzinId === m.id;
+            const playing = player.playing === m.id;
             return (
               <div key={m.id} className="list-row list-row--plain">
                 <button
@@ -174,6 +261,7 @@ export default function AdhanSettings() {
                   aria-checked={selected}
                   className="flex-1 flex items-center gap-3 text-right min-h-11"
                   onClick={() => updateAdhanPrefs({ muezzinId: m.id })}
+                  data-testid={`muezzin-${m.id}`}
                 >
                   <span
                     aria-hidden="true"
@@ -191,17 +279,25 @@ export default function AdhanSettings() {
                 <button
                   type="button"
                   className="btn btn-soft !min-h-9 !px-4 !text-sm"
-                  onClick={() => preview(m.id, m.audioUrl)}
-                  aria-label={playing === m.id ? `إيقاف ${m.name}` : `استماع ${m.name}`}
+                  onClick={() => void preview(m.id, m.audioUrl)}
+                  aria-label={playing ? `إيقاف ${m.name}` : `استماع ${m.name}`}
+                  data-testid={`preview-${m.id}`}
                 >
-                  {playing === m.id ? "إيقاف" : "استماع"}
+                  {playing ? "إيقاف" : "استماع"}
                 </button>
               </div>
             );
           })}
         </ListSection>
 
-        <ListSection title="طريقة الحساب">
+        <ListSection
+          title="طريقة الحساب"
+          footer="أم القرى: الفجر بزاوية ١٨٫٥°، والعشاء بعد المغرب بـ٩٠ دقيقة (١٢٠ دقيقة في رمضان). قد يختلف التقويم الرسمي لمدينتك دقيقة أو دقيقتين بسبب الإحداثيات المعتمدة والتقريب."
+        >
+          <ListRow label="ضبط أم القرى للمملكة" hint="أم القرى مع حساب العصر للجمهور" testId="saudi-calculation" onClick={() => {
+            updateAdhanPrefs({ calcMethod: "UmmAlQura", madhab: "Shafi" });
+            toast.success("تم ضبط أم القرى وحساب العصر للجمهور");
+          }} />
           <div className="list-row list-row--plain">
             <label htmlFor="calc-method" className="list-row__body list-row__label">
               الطريقة
@@ -228,18 +324,85 @@ export default function AdhanSettings() {
               value={prefs.madhab === "Hanafi" ? "Hanafi" : "Shafi"}
               onChange={(v) => updateAdhanPrefs({ madhab: v })}
               options={[
-                { value: "Shafi", label: "شافعي / مالكي" },
+                { value: "Shafi", label: "الجمهور (الافتراضي)" },
                 { value: "Hanafi", label: "حنفي" },
               ]}
             />
+            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+              الجمهور (الشافعي والمالكي والحنبلي، المعمول به في المملكة): حين يصير ظل الشيء مثله. الحنفي: حين يصير مثليه، فيتأخر العصر.
+            </p>
           </div>
         </ListSection>
+
+        {native && (
+          <ListSection title="حالة التنبيهات" footer={platform === "ios" ? "اختر التسليم الفوري لتنبيهات مصحفك في إعدادات الآيفون، واستثنِ التطبيق من ملخص الإشعارات والتركيز لتجنب تأخير التنبيه." : "راجع إذن التنبيه في الوقت الدقيق وإعدادات البطارية إذا تأخرت التنبيهات."}>
+            <ListRow label="إذن الإشعارات" value={permissionLabel} />
+            {platform === "android" && <ListRow label="التنبيه في الوقت الدقيق" value={exact === "granted" ? "مسموح" : exact === "denied" ? "غير مسموح" : "—"} />}
+            {timeZone && <ListRow label="المنطقة الزمنية للجهاز" value={<span dir="ltr">{timeZone}</span>} />}
+            <ListRow icon="info" label="عرض التنبيهات المجدولة" onClick={() => void loadDiagnostics()} testId="load-diagnostics" />
+            {diag && (
+              <div className="px-4 py-3 text-xs leading-relaxed" data-testid="diagnostics">
+                <p className="font-bold mb-1">
+                  المجدول على الجهاز: {ar(diag.total)} إشعار، منها {ar(diag.prayer.length)} للصلاة
+                </p>
+                {today.length > 0 && (
+                  <p className="text-muted-foreground mb-2">
+                    مواقيت اليوم: {today.map((t) => `${PRAYER_LABEL[t.key as PrayerKey]} ${clock(t.time).time}`).join(" · ")}
+                  </p>
+                )}
+                <ul className="space-y-1" dir="rtl">
+                  {diag.prayer.slice(0, 12).map((n) => (
+                    <li key={n.id} className="flex gap-2 justify-between">
+                      <span>{n.title}</span>
+                      <span dir="ltr" className="tabular-nums text-muted-foreground">
+                        #{n.id} · {timeLabel(n.at)}
+                        {n.prayerTime && n.at && n.prayerTime.getTime() !== n.at.getTime() ? ` (الأذان ${clock(n.prayerTime).time})` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="font-bold mt-3 mb-1" data-testid="diagnostics-reminders">
+                  التذكيرات اليومية المجدولة: {diag.reminders.length ? "" : "لا يوجد"}
+                </p>
+                <ul className="space-y-1" dir="rtl">
+                  {diag.reminders.map((n) => (
+                    <li key={n.id} className="flex gap-2 justify-between">
+                      <span>{n.title}</span>
+                      <span dir="ltr" className="tabular-nums text-muted-foreground">
+                        #{n.id} · {n.time}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </ListSection>
+        )}
       </div>
 
       <Sheet open={snoozeOpen} onClose={() => setSnoozeOpen(false)} title="مدة الإيقاف">
         <div className="list-group -mx-1 mb-2">
           {SNOOZE_OPTIONS.map((o) => (
             <ListRow key={String(o.days)} label={o.label} onClick={() => snooze(o.days)} chevron={false} />
+          ))}
+        </div>
+      </Sheet>
+
+      <Sheet open={cityOpen} onClose={() => setCityOpen(false)} title="اختر مدينتك">
+        <div className="list-group -mx-1 mb-2 max-h-[60vh] overflow-y-auto">
+          {SAUDI_CITIES.map((c) => (
+            <ListRow
+              key={c.id}
+              label={c.name}
+              hint={c.region}
+              chevron={false}
+              testId={`city-${c.id}`}
+              onClick={() => {
+                setManualLocation(c.coords, c.name);
+                setCityOpen(false);
+                toast.success(`تم اختيار ${c.name}`);
+              }}
+            />
           ))}
         </div>
       </Sheet>

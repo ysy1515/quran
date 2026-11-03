@@ -7,7 +7,7 @@ import {
   toggleBookmark,
   toggleFavorite,
 } from "./bookmarks";
-import { DEFAULT_DHIKR, chooseDhikr, dhikrStore, parseDhikrState, resetDhikrCount, setDhikrTarget, tapDhikr } from "./dhikr";
+import { DEFAULT_DHIKR, chooseDhikr, dhikrStore, parseDhikrState, resetDhikrAll, resetDhikrCount, resetDhikrSessions, setDhikrTarget, tapDhikr } from "./dhikr";
 import { DEFAULT_REMINDERS, parseReminders, setReminder } from "./reminders";
 import { addReadingSeconds, readingTimeStore } from "./readingTime";
 
@@ -74,6 +74,17 @@ describe("tasbeeh counter", () => {
     tapDhikr();
     chooseDhikr("أَسْتَغْفِرُ اللَّهَ", 100);
     expect(dhikrStore.get()).toMatchObject({ presetText: "أَسْتَغْفِرُ اللَّهَ", target: 100, count: 0, sessions: 2 });
+  });
+
+  it("can reset the finished rounds alone, or everything", () => {
+    setDhikrTarget(2);
+    for (let i = 0; i < 5; i++) tapDhikr();
+    expect(dhikrStore.get()).toMatchObject({ count: 5, sessions: 1 });
+    resetDhikrSessions();
+    expect(dhikrStore.get()).toMatchObject({ count: 5, sessions: 0, target: 2 });
+    tapDhikr();
+    resetDhikrAll();
+    expect(dhikrStore.get()).toMatchObject({ count: 0, sessions: 0, target: 2 });
   });
 });
 

@@ -51,6 +51,15 @@ export function resetDhikrCount() {
   dhikrStore.update((s) => ({ ...s, count: 0 }));
 }
 
+/** Clears the finished-rounds counter; the current count is kept. */
+export function resetDhikrSessions() {
+  dhikrStore.update((s) => ({ ...s, sessions: 0 }));
+}
+
+export function resetDhikrAll() {
+  dhikrStore.update((s) => ({ ...s, count: 0, sessions: 0 }));
+}
+
 export function chooseDhikr(presetText: string, target: number) {
   dhikrStore.update((s) => ({ ...s, presetText, target, count: 0 }));
 }
