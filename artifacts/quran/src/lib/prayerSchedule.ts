@@ -1,5 +1,5 @@
 import { ANDROID_PRAYER_DEFAULT_CHANNEL, muezzinFor } from "./muezzins";
-import { isSnoozed, localNoon, prayerTimesFor, PRAYER_LABEL, type AdhanPrefs, type Coords, type PrayerKey } from "./prayer";
+import { localNoon, prayerTimesFor, PRAYER_LABEL, type AdhanPrefs, type Coords, type PrayerKey } from "./prayer";
 
 // Pure planning of the prayer notifications: which ones should be pending right
 // now, with which ID, time, sound and channel. The native side (prayerNotifications.ts)
@@ -75,7 +75,7 @@ export function planPrayerNotifications(
   platform: Platform,
 ): PlannedNotification[] {
   if (!coords || !prefs.enabled || prefs.snoozedUntil === -1) return [];
-  const notBefore = isSnoozed(prefs.snoozedUntil) && prefs.snoozedUntil ? Math.max(now.getTime(), prefs.snoozedUntil) : now.getTime();
+  const notBefore = Math.max(now.getTime(), prefs.snoozedUntil ?? 0);
   const days = scheduleDays(prefs, platform);
   const adhanSound = soundFor(prefs, platform);
   const deviceSound = soundFor({ alertSound: "device", muezzinId: prefs.muezzinId }, platform);

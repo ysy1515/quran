@@ -31,8 +31,10 @@ export interface SyncResult {
 const SMALL_ICON = "ic_stat_mushafak";
 const ICON_COLOR = "#1a4731";
 
-async function plugin() {
-  return (await import("@capacitor/local-notifications")).LocalNotifications;
+function plugin() {
+  // Capacitor plugins are Proxies with a synthetic `then` method. Resolve the
+  // module instead, otherwise Promise assimilation hangs before any native call.
+  return import("@capacitor/local-notifications");
 }
 
 function platform(): Platform {
@@ -47,7 +49,7 @@ const devLog = (...args: unknown[]) => {
 export async function checkDisplayPermission(): Promise<DisplayPermission> {
   if (!isCapacitorNative()) return "unsupported";
   try {
-    const r = await (await plugin()).checkPermissions();
+    const r = await (await plugin()).LocalNotifications.checkPermissions();
     return r.display === "granted" ? "granted" : r.display === "denied" ? "denied" : "prompt";
   } catch {
     return "unsupported";
@@ -58,7 +60,7 @@ export async function checkDisplayPermission(): Promise<DisplayPermission> {
 export async function checkExactAlarm(): Promise<"granted" | "denied" | "unsupported"> {
   if (!isCapacitorNative() || platform() !== "android") return "unsupported";
   try {
-    const r = await (await plugin()).checkExactNotificationSetting();
+    const r = await (await plugin()).LocalNotifications.checkExactNotificationSetting();
     return r.exact_alarm === "granted" ? "granted" : "denied";
   } catch {
     return "unsupported";
@@ -69,7 +71,7 @@ export async function checkExactAlarm(): Promise<"granted" | "denied" | "unsuppo
 export async function openExactAlarmSettings(): Promise<void> {
   if (!isCapacitorNative() || platform() !== "android") return;
   try {
-    await (await plugin()).changeExactNotificationSetting();
+    await (await plugin()).LocalNotifications.changeExactNotificationSetting();
   } catch {
     // The settings page is not available on this device.
   }
@@ -109,7 +111,7 @@ export function syncPrayerNotifications(coords: Coords | null, prefs: AdhanPrefs
 async function doSync(coords: Coords | null, prefs: AdhanPrefs, now: Date): Promise<SyncResult> {
   if (!isCapacitorNative()) return { status: "unsupported", planned: 0, cancelled: 0 };
   try {
-    const ln = await plugin();
+    const { LocalNotifications: ln } = await plugin();
     const plan = planPrayerNotifications(coords, prefs, now, platform());
     const wanted = new Map(plan.map((n) => [String(n.id), n]));
 
@@ -144,7 +146,7 @@ export function cancelAllPrayerNotifications(): Promise<void> {
   const run = queue.then(async () => {
     if (!isCapacitorNative()) return;
     try {
-      const ln = await plugin();
+      const { LocalNotifications: ln } = await plugin();
       const ours = (await ln.getPending()).notifications.filter((n) => n.id >= PRAYER_ID_MIN && n.id <= PRAYER_ID_MAX);
       if (ours.length) await ln.cancel({ notifications: ours.map((n) => ({ id: n.id })) });
       scheduled.clear();
@@ -160,7 +162,7 @@ export function cancelAllPrayerNotifications(): Promise<void> {
 export async function sendTestNotification(prefs: Pick<AdhanPrefs, "alertSound" | "muezzinId">): Promise<boolean> {
   if (!isCapacitorNative()) return false;
   try {
-    const ln = await plugin();
+    const { LocalNotifications: ln } = await plugin();
     const { sound, channelId } = soundFor(prefs, platform());
     await ln.schedule({
       notifications: [
@@ -208,7 +210,7 @@ export interface PendingOverview {
 export async function pendingNotifications(): Promise<PendingOverview> {
   if (!isCapacitorNative()) return { total: 0, prayer: [], reminders: [] };
   try {
-    const all = (await (await plugin()).getPending()).notifications;
+    const all = (await (await plugin()).LocalNotifications.getPending()).notifications;
     const num = (v: unknown) => (typeof v === "string" && v ? new Date(Number(v)) : null);
     const prayer = all
       .filter((n) => n.id >= PRAYER_ID_MIN && n.id <= PRAYER_ID_MAX)

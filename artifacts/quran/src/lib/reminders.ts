@@ -63,23 +63,56 @@ export function useReminders(): Reminders {
 
 export const remindersSupported = () => isCapacitorNative();
 
-async function plugin() {
-  return (await import("@capacitor/local-notifications")).LocalNotifications;
+function plugin() {
+  // Resolve the module, never the Capacitor Proxy: returning the proxy from an
+  // async function invokes its synthetic `then` method and leaves it pending.
+  return import("@capacitor/local-notifications");
+}
+
+class ReminderTimeout extends Error {}
+
+// A missing native response must not keep every later edit stuck in the queue.
+async function nativeCall<T>(operation: Promise<T>, timeout = 8000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new ReminderTimeout()), timeout);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function failureResult(error: unknown): ReminderResult {
+  if (error instanceof ReminderTimeout) return "timeout";
+  if ((error as { code?: string })?.code === "UNIMPLEMENTED") return "unavailable";
+  return "error";
+}
+
+async function permissionResult(): Promise<ReminderResult> {
+  if (!isCapacitorNative()) return "unsupported";
+  try {
+    const { LocalNotifications: ln } = await plugin();
+    const current = await nativeCall(ln.checkPermissions());
+    if (current.display === "granted") return "ok";
+    if (current.display === "denied") return "denied";
+    // Allow time for the user to respond to the system permission dialog.
+    const result = await nativeCall(ln.requestPermissions(), 60000);
+    return result.display === "granted" ? "ok" : "denied";
+  } catch (error) {
+    return failureResult(error);
+  }
 }
 
 /** Ask for permission (native only). */
 export async function requestReminderPermission(): Promise<boolean> {
-  if (!isCapacitorNative()) return false;
-  try {
-    const ln = await plugin();
-    const res = await ln.requestPermissions();
-    return res.display === "granted";
-  } catch {
-    return false;
-  }
+  return (await permissionResult()) === "ok";
 }
 
-export type ReminderResult = "ok" | "denied" | "unsupported" | "error";
+export type ReminderResult = "ok" | "denied" | "unsupported" | "unavailable" | "timeout" | "error";
 let queue: Promise<unknown> = Promise.resolve();
 
 function enqueue<T>(work: () => Promise<T>): Promise<T> {
@@ -96,9 +129,9 @@ export function syncReminders(): Promise<ReminderResult> {
 async function scheduleReminders(r: Reminders): Promise<ReminderResult> {
   if (!isCapacitorNative()) return "unsupported";
   try {
-    const ln = await plugin();
-    if (REMINDER_IDS.some((id) => r[id].on) && (await ln.checkPermissions()).display !== "granted") return "denied";
-    const pending = await ln.getPending();
+    const { LocalNotifications: ln } = await plugin();
+    if (REMINDER_IDS.some((id) => r[id].on) && (await nativeCall(ln.checkPermissions())).display !== "granted") return "denied";
+    const pending = await nativeCall(ln.getPending());
     const notifications = REMINDER_IDS.filter((id) => r[id].on).map((id) => {
       const [hour, minute] = r[id].time.split(":").map(Number) as [number, number];
       return {
@@ -115,14 +148,14 @@ async function scheduleReminders(r: Reminders): Promise<ReminderResult> {
         extra: { route: REMINDER_TEXT[id].route, kind: "reminder" },
       };
     });
-    if (notifications.length) await ln.schedule({ notifications });
+    if (notifications.length) await nativeCall(ln.schedule({ notifications }));
     const wanted = new Set(notifications.map((n) => n.id));
     const obsolete = pending.notifications.filter((n) => n.id >= ID_BASE && n.id < ID_BASE + 100 && !wanted.has(n.id));
-    if (obsolete.length) await ln.cancel({ notifications: obsolete.map((n) => ({ id: n.id })) });
+    if (obsolete.length) await nativeCall(ln.cancel({ notifications: obsolete.map((n) => ({ id: n.id })) }));
     return "ok";
   } catch (err) {
     console.warn("[Reminders] schedule failed:", err);
-    return "error";
+    return failureResult(err);
   }
 }
 
@@ -130,15 +163,18 @@ export function setReminder(id: ReminderId, patch: Partial<Reminder>): Promise<R
   return enqueue(async () => {
     if (!isCapacitorNative()) return "unsupported";
     if (patch.time !== undefined && !TIME_RE.test(patch.time)) return "error";
-    if (patch.on && !(await requestReminderPermission())) return "denied";
+    if (patch.on) {
+      const result = await permissionResult();
+      if (result !== "ok") return result;
+    }
     const previous = remindersStore.get();
     const next = { ...previous, [id]: { ...previous[id], ...patch } };
     if (!next[id].on) {
       // Turning a reminder off must also work after OS permission is revoked.
       try {
-        await (await plugin()).cancel({ notifications: [{ id: NOTIF_ID[id] }] });
-      } catch {
-        return "error";
+        await nativeCall((await plugin()).LocalNotifications.cancel({ notifications: [{ id: NOTIF_ID[id] }] }));
+      } catch (error) {
+        return failureResult(error);
       }
     } else {
       const result = await scheduleReminders(next);

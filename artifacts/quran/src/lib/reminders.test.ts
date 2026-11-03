@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectDurableStorage, disconnectDurableStorageForTests } from "./localStore";
 import { DEFAULT_REMINDERS, remindersStore, setReminder, syncReminders } from "./reminders";
 
@@ -22,6 +22,8 @@ beforeEach(() => {
   ln.cancel.mockResolvedValue(undefined);
 });
 
+afterEach(() => vi.useRealTimers());
+
 describe("daily reminder activation", () => {
   it("schedules a repeating audible alert and restores its saved time after restart", async () => {
     const values = new Map<string, string>();
@@ -43,6 +45,7 @@ describe("daily reminder activation", () => {
   });
 
   it("keeps settings off when permission is refused", async () => {
+    ln.checkPermissions.mockResolvedValue({ display: "prompt" });
     ln.requestPermissions.mockResolvedValue({ display: "denied" });
     expect(await setReminder("wird", { on: true })).toBe("denied");
     expect(remindersStore.get()).toEqual(DEFAULT_REMINDERS);
@@ -103,5 +106,31 @@ describe("daily reminder activation", () => {
     ln.cancel.mockRejectedValueOnce(new Error("cancel failed"));
     expect(await setReminder("wird", { on: false })).toBe("error");
     expect(remindersStore.get().wird.on).toBe(true);
+  });
+
+  it("releases a stalled startup sync so later switches can work", async () => {
+    vi.useFakeTimers();
+    ln.getPending.mockImplementationOnce(() => new Promise(() => {}));
+    const stalled = syncReminders();
+    const edit = setReminder("wird", { on: true });
+    await vi.advanceTimersByTimeAsync(8001);
+    expect(await stalled).toBe("timeout");
+    expect(await edit).toBe("ok");
+    expect(remindersStore.get().wird.on).toBe(true);
+  });
+
+  it("does not report a missing native plugin as permission denied", async () => {
+    ln.checkPermissions.mockRejectedValue({ code: "UNIMPLEMENTED" });
+    expect(await setReminder("wird", { on: true })).toBe("unavailable");
+    expect(remindersStore.get().wird.on).toBe(false);
+  });
+
+  it("does not save an enabled switch when scheduling never responds", async () => {
+    vi.useFakeTimers();
+    ln.schedule.mockImplementationOnce(() => new Promise(() => {}));
+    const edit = setReminder("wird", { on: true });
+    await vi.advanceTimersByTimeAsync(8001);
+    expect(await edit).toBe("timeout");
+    expect(remindersStore.get().wird.on).toBe(false);
   });
 });

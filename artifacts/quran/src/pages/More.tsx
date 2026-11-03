@@ -7,7 +7,7 @@ import { useKhatmah } from "@/lib/khatmah";
 import { useBookmarks, useFavorites } from "@/lib/bookmarks";
 import { useReadingProgress } from "@/lib/userData";
 import { useReadingTime } from "@/lib/readingTime";
-import { REMINDER_TEXT, remindersStore, remindersSupported, setReminder, useReminders, type ReminderId } from "@/lib/reminders";
+import { REMINDER_TEXT, remindersStore, remindersSupported, setReminder, useReminders, type ReminderId, type ReminderResult } from "@/lib/reminders";
 import { useDhikrState } from "@/lib/dhikr";
 import { rateApp, shareApp } from "@/lib/appActions";
 import { ayahCount, surahName } from "@workspace/quran-meta";
@@ -16,6 +16,14 @@ import { readerHref } from "@/lib/useQuranLinks";
 
 /** The quick list of the last ten surahs from the previous home screen, An-Nas first. */
 const SHORT_SURAHS = Array.from({ length: 10 }, (_, i) => 114 - i);
+
+const REMINDER_ERROR: Record<Exclude<ReminderResult, "ok">, string> = {
+  denied: "لم يتم منح إذن الإشعارات، يرجى السماح من إعدادات الجهاز",
+  unsupported: "أنت تستخدم نسخة المتصفح. افتح التطبيق المثبت من TestFlight أو المتجر لتفعيل التذكيرات اليومية.",
+  unavailable: "خدمة الإشعارات غير موجودة في هذه النسخة. حدّث التطبيق من TestFlight.",
+  timeout: "لم تستجب خدمة الإشعارات. أعد فتح التطبيق ثم حاول مرة أخرى.",
+  error: "تعذّر حفظ التذكير، حاول مرة أخرى",
+};
 
 function Badge({ children }: { children: React.ReactNode }) {
   return <span className="badge-count">{children}</span>;
@@ -26,6 +34,7 @@ function ReminderRow({ id, label, hint }: { id: ReminderId; label: string; hint?
   const r = reminders[id];
   const supported = remindersSupported();
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   // The time picker edits a local draft. iOS fires "change" on every turn of the wheel;
   // saving each one (and disabling the input meanwhile) closed the picker and snapped the
   // time back. The draft is saved once, when the picker closes or after a short pause.
@@ -36,10 +45,13 @@ function ReminderRow({ id, label, hint }: { id: ReminderId; label: string; hint?
 
   const apply = async (patch: { on?: boolean; time?: string }) => {
     setSaving(true);
+    setError(null);
     try {
       const res = await setReminder(id, patch);
-      if (res === "denied") toast.error("لم يتم منح إذن الإشعارات، يرجى السماح من إعدادات الجهاز");
-      else if (res === "error") toast.error("تعذّر حفظ التذكير، حاول مرة أخرى");
+      if (res !== "ok") {
+        setError(REMINDER_ERROR[res]);
+        toast.error(REMINDER_ERROR[res]);
+      }
       else if (res === "ok" && patch.on) toast.success(`سيصلك تذكير ${REMINDER_TEXT[id].title} يوميًا`);
       else if (res === "ok" && patch.time) toast.success(`تم ضبط ${REMINDER_TEXT[id].title} على ${patch.time}`);
     } finally {
@@ -64,6 +76,9 @@ function ReminderRow({ id, label, hint }: { id: ReminderId; label: string; hint?
       <span className="list-row__body">
         <span className="list-row__label block">{label}</span>
         {hint && <span className="list-row__hint block">{hint}</span>}
+        <span className="list-row__hint block" role="status">
+          {saving ? "جاري الحفظ…" : error ? error : !supported ? "يتطلب تطبيق الجوال" : r.on ? "مفعّل" : "غير مفعّل"}
+        </span>
       </span>
       {r.on && supported && (
         <input
@@ -96,7 +111,7 @@ export default function More() {
   const dhikr = useDhikrState();
   const supported = remindersSupported();
   const { fullCount, partialCount, lastFull } = k.stats;
-  const webNote = supported ? undefined : "التذكيرات اليومية متاحة في تطبيق الآيفون وأندرويد.";
+  const webNote = supported ? "تُجدول هذه التنبيهات على جهازك. جرّب «إرسال إشعار تجريبي» من إعدادات الأذان للتأكد من وصول الصوت والإشعار." : REMINDER_ERROR.unsupported;
 
   return (
     <Screen title="المزيد">
