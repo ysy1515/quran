@@ -114,6 +114,10 @@ export default function Adhan() {
       await requestLocation();
     } catch (err) {
       const denied = (err as GeolocationPositionError)?.code === 1;
+      if (err instanceof Error && err.message === "inaccurate-location") {
+        toast.error("الموقع التقريبي غير كافٍ. فعّل الموقع الدقيق في إعدادات الجهاز ثم حاول مجددًا.");
+        return;
+      }
       toast.error(denied ? "تم رفض الوصول إلى الموقع، يرجى السماح من الإعدادات" : "تعذّر تحديد الموقع");
     } finally {
       setLocLoading(false);

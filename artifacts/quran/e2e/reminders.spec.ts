@@ -11,6 +11,7 @@ async function nativeBridge(page: Page, permission = "granted") {
       LocalNotifications: ["requestPermissions", "checkPermissions", "getPending", "schedule", "cancel", "addListener", "removeListener"],
       StatusBar: ["setStyle"],
       AppReview: ["requestReview", "openStoreReview"],
+      QiblaCompass: ["start", "read", "stop"],
     };
     Object.assign(window, {
       webkit: { messageHandlers: { bridge: {} } },
@@ -19,6 +20,11 @@ async function nativeBridge(page: Page, permission = "granted") {
           name, methods: names.map((name) => ({ name, rtype: "promise" })),
         })),
         nativePromise: async (plugin: string, method: string, options: Record<string, unknown> = {}) => {
+          if (plugin === "QiblaCompass") {
+            if (method === "read") return { valid: localStorage.getItem("compass-invalid") !== "1", heading: 319.28, accuracy: 3, lat: 18.3, lng: 42.7333, locationAccuracy: 10 };
+            localStorage.setItem(`compass:${method}`, "1");
+            return {};
+          }
           if (plugin === "AppReview") {
             const key = `native:review:${method}`;
             localStorage.setItem(key, String(Number(localStorage.getItem(key) ?? 0) + 1));
@@ -80,18 +86,12 @@ test("permission denial leaves the switch usable and explains the failure", asyn
   await expect(toggle).toBeEnabled();
 });
 
-test("native prayer permission, test alert and pending diagnostics respond", async ({ page }) => {
+test("production settings remove the test alert and keep diagnostics", async ({ page }) => {
   await nativeBridge(page);
   await page.goto("/adhan/settings");
-  await page.getByTestId("test-notification").click();
-  await expect(page.getByText("سيصلك إشعار تجريبي بعد ٥ ثوانٍ، يمكنك قفل الشاشة")).toBeVisible();
+  await expect(page.getByTestId("test-notification")).toHaveCount(0);
   await page.getByTestId("load-diagnostics").click();
   await expect(page.getByTestId("diagnostics")).toBeVisible();
-  const pending = await page.evaluate(() => JSON.parse(localStorage.getItem("native:pending") ?? "[]"));
-  expect(pending).toHaveLength(1);
-  expect(pending[0].extra.kind).toBe("test");
-  expect(pending[0].sound).toBeTruthy();
-  expect(new Date(pending[0].schedule.at).getTime()).toBeGreaterThan(Date.now() - 10000);
 });
 
 test("native prayer switch schedules audible alerts and cancels them when disabled", async ({ page }) => {
@@ -132,4 +132,35 @@ test("automatic review waits for established use and is not repeated after reloa
   await page.reload();
   await page.waitForTimeout(4500);
   expect(await page.evaluate(() => localStorage.getItem("native:review:requestReview"))).toBe("1");
+});
+
+test("qibla uses a fresh fix, hides unreliable readings and stops on exit", async ({ page }) => {
+  await nativeBridge(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "geolocation", { value: {
+      getCurrentPosition: (success: (p: unknown) => void) => success({ coords: { latitude: 18.3, longitude: 42.7333, accuracy: 10 } }),
+    } });
+  });
+  await page.goto("/more");
+  await page.getByRole("link", { name: /القبلة/ }).click();
+  await page.getByRole("button", { name: "تحديد موقعي وتشغيل القبلة" }).click();
+  await expect(page.getByTestId("qibla-bearing")).toContainText("319.3");
+  await expect(page.getByTestId("qibla-arrow")).toBeVisible();
+  await expect(page.getByTestId("qibla-status")).toContainText("أنت باتجاه القبلة");
+  await page.screenshot({ path: "node_modules/qibla-preview.png" });
+  await page.evaluate(() => localStorage.setItem("compass-invalid", "1"));
+  await expect(page.getByTestId("qibla-arrow")).toHaveCount(0);
+  await page.getByRole("button", { name: "رجوع", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("compass:stop"))).toBe("1");
+});
+
+test("Saudi calculation reset saves Umm al-Qura and standard Asr together", async ({ page }) => {
+  await nativeBridge(page);
+  await page.goto("/adhan/settings");
+  await page.getByTestId("calc-method").selectOption("Egyptian");
+  await page.getByRole("tab", { name: "حنفي", exact: true }).click();
+  await page.getByTestId("saudi-calculation").click();
+  await page.reload();
+  await expect(page.getByTestId("calc-method")).toHaveValue("UmmAlQura");
+  await expect(page.getByRole("tab", { name: "الجمهور (الافتراضي)", exact: true })).toHaveAttribute("aria-selected", "true");
 });

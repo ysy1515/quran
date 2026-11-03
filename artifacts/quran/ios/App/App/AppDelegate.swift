@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import StoreKit
+import CoreLocation
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -54,6 +55,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 class AppViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(AppReviewPlugin())
+        bridge?.registerPluginInstance(QiblaCompassPlugin())
     }
 }
 
@@ -102,4 +104,91 @@ public class AppReviewPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         }
     }
+}
+
+
+// True north is required: a magnetic heading alone can point several degrees away.
+@objc(QiblaCompassPlugin)
+public class QiblaCompassPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegate {
+    public let identifier = "QiblaCompassPlugin"
+    public let jsName = "QiblaCompass"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "read", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise)
+    ]
+    private var manager: CLLocationManager?
+    private var heading: CLHeading?
+    private var position: CLLocation?
+
+    @objc func start(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard CLLocationManager.headingAvailable() else {
+                call.reject("Compass unavailable")
+                return
+            }
+            let manager = self.manager ?? CLLocationManager()
+            self.manager = manager
+            manager.delegate = self
+            manager.desiredAccuracy = kCLLocationAccuracyBest
+            manager.headingFilter = 1
+            // The UI instructs the user to hold the phone upright in portrait.
+            manager.headingOrientation = .portrait
+            self.heading = nil
+            self.position = nil
+            manager.requestWhenInUseAuthorization()
+            manager.startUpdatingLocation()
+            manager.startUpdatingHeading()
+            call.resolve()
+        }
+    }
+    @objc func stop(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            self.manager?.stopUpdatingHeading()
+            self.manager?.stopUpdatingLocation()
+            self.heading = nil
+            self.position = nil
+            call.resolve()
+        }
+    }
+    @objc func read(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard UIApplication.shared.applicationState == .active else {
+                call.resolve(["valid": false])
+                return
+            }
+            if let manager = self.manager,
+               manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted {
+                call.reject("Location permission denied")
+                return
+            }
+            guard let heading = self.heading, let position = self.position,
+                  heading.trueHeading >= 0, heading.headingAccuracy >= 0,
+                  heading.headingAccuracy <= 20, position.horizontalAccuracy >= 0,
+                  position.horizontalAccuracy <= 1000,
+                  abs(heading.timestamp.timeIntervalSinceNow) < 10,
+                  abs(position.timestamp.timeIntervalSinceNow) < 30 else {
+                call.resolve(["valid": false])
+                return
+            }
+            // iPad may present the portrait UI upside down; its screen top is the
+            // opposite physical edge from Core Location's fixed portrait heading.
+            let upsideDown = self.bridge?.viewController?.view.window?.windowScene?.interfaceOrientation == .portraitUpsideDown
+            let screenHeading = (heading.trueHeading + (upsideDown ? 180 : 0)).truncatingRemainder(dividingBy: 360)
+            call.resolve(["valid": true, "heading": screenHeading,
+                          "accuracy": heading.headingAccuracy,
+                          "lat": position.coordinate.latitude, "lng": position.coordinate.longitude,
+                          "locationAccuracy": position.horizontalAccuracy])
+        }
+    }
+    public func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        heading = newHeading
+    }
+    public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        position = locations.last
+    }
+    public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        position = nil
+    }
+    public func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool { true }
 }

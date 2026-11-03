@@ -99,3 +99,15 @@ describe("saved prayer settings", () => {
     expect(out.calcMethod).toBe("UmmAlQura");
   });
 });
+
+it("matches an independent Umm al-Qura API within one minute on 4 Nov 2026", () => {
+  // Retrieved 2026-11-04: https://api.aladhan.com/v1/timings/04-11-2026?latitude=18.3&longitude=42.7333&method=4&school=0&timezonestring=Asia%2FRiyadh
+  // Aladhan is an independent calculation, not the official Saudi timetable.
+  const reference = { fajr: "04:53", sunrise: "06:10", dhuhr: "11:53", asr: "15:10", maghrib: "17:35", isha: "19:05" };
+  const actual = times(new Date(2026, 10, 4, 12));
+  for (const [key, value] of Object.entries(reference)) {
+    const [h, m] = value.split(":").map(Number);
+    const expected = Date.UTC(2026, 10, 4, h - 3, m);
+    expect(Math.abs(actual[key]!.getTime() - expected)).toBeLessThanOrEqual(60_000);
+  }
+});

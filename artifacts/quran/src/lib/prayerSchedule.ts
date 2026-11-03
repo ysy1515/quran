@@ -13,14 +13,12 @@ export const PRAYER_ID_MIN = 1000;
 export const PRAYER_ID_MAX = 1999;
 /** "Open the app to refresh" notice, shown on the last scheduled day. */
 export const REFRESH_NOTICE_ID = 1990;
-/** One-off test notification from the diagnostics section. */
-export const TEST_NOTIFICATION_ID = 1991;
 
 /** Days ahead to keep scheduled. Each app start, resume or settings change moves the window forward. */
 export const SCHEDULE_DAYS = 7;
 /** iOS keeps at most 64 pending notifications per app; anything beyond is silently dropped. */
 export const IOS_PENDING_LIMIT = 64;
-/** Room kept on iOS for the 5 daily reminders, the refresh notice and the test notification. */
+/** Room kept on iOS for the 5 daily reminders, the refresh notice and spare capacity. */
 const IOS_RESERVED = 8;
 
 export const NOTIFIABLE: Exclude<PrayerKey, "sunrise">[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
@@ -130,7 +128,7 @@ export function planPrayerNotifications(
         id: REFRESH_NOTICE_ID,
         kind: "refresh",
         at,
-        title: "تنبيهات الأذان تنتهي اليوم",
+        title: "تذكير بتحديث جدول التنبيهات",
         body: "افتح مصحفك لتحديث تنبيهات الأذان للأيام القادمة",
         ...deviceSound,
       });

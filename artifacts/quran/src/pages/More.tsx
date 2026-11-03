@@ -111,7 +111,7 @@ export default function More() {
   const dhikr = useDhikrState();
   const supported = remindersSupported();
   const { fullCount, partialCount, lastFull } = k.stats;
-  const webNote = supported ? "تُجدول هذه التنبيهات على جهازك. جرّب «إرسال إشعار تجريبي» من إعدادات الأذان للتأكد من وصول الصوت والإشعار." : REMINDER_ERROR.unsupported;
+  const webNote = supported ? "تُجدول هذه التنبيهات على جهازك. يمكنك مراجعة أوقاتها من إعدادات الأذان ← حالة التنبيهات ← عرض التنبيهات المجدولة." : REMINDER_ERROR.unsupported;
 
   return (
     <Screen title="المزيد">
@@ -158,6 +158,7 @@ export default function More() {
 
         <ListSection title="الإعدادات">
           <ListRow icon="palette" href="/settings" label="المظهر والقراءة" hint="الوضع الليلي، حجم الخط، التفسير" />
+          <ListRow icon="mosque" href="/qibla" label="القبلة" hint="اتجاه الكعبة من موقعك" />
           <ListRow icon="mosque" href="/adhan/settings" label="إعدادات الأذان" hint="الموقع، الصوت، طريقة الحساب" />
           <ListRow icon="beads" href="/dhikr" label="التسبيح" value={dhikr.count ? <Badge>{ar(dhikr.count)}</Badge> : undefined} />
         </ListSection>

@@ -27,7 +27,6 @@ import {
   checkExactAlarm,
   openExactAlarmSettings,
   pendingNotifications,
-  sendTestNotification,
   syncPrayerNotifications,
   type PendingOverview,
 } from "@/lib/prayerNotifications";
@@ -121,6 +120,10 @@ export default function AdhanSettings() {
       return true;
     } catch (err) {
       const denied = (err as GeolocationPositionError)?.code === 1;
+      if (err instanceof Error && err.message === "inaccurate-location") {
+        toast.error("الموقع التقريبي غير كافٍ. فعّل الموقع الدقيق في إعدادات الجهاز ثم حاول مجددًا.");
+        return false;
+      }
       toast.error(denied ? "تم رفض الوصول إلى الموقع، يمكنك السماح من الإعدادات أو اختيار مدينتك" : "تعذّر تحديد الموقع، يمكنك اختيار مدينتك من القائمة");
       return false;
     } finally {
@@ -154,15 +157,6 @@ export default function AdhanSettings() {
     if (coords) await syncPrayerNotifications(coords, prefs);
     setDiag(await pendingNotifications());
     await refreshStatus();
-  };
-
-  const test = async () => {
-    if (!(await requestPermission())) {
-      toast.error("لم يتم منح إذن الإشعارات، يرجى السماح من إعدادات الجهاز");
-      return;
-    }
-    if (await sendTestNotification(prefs)) toast.success("سيصلك إشعار تجريبي بعد ٥ ثوانٍ، يمكنك قفل الشاشة");
-    else toast.error("تعذّر إرسال الإشعار التجريبي");
   };
 
   const permissionLabel =
@@ -300,6 +294,10 @@ export default function AdhanSettings() {
           title="طريقة الحساب"
           footer="أم القرى: الفجر بزاوية ١٨٫٥°، والعشاء بعد المغرب بـ٩٠ دقيقة (١٢٠ دقيقة في رمضان). قد يختلف التقويم الرسمي لمدينتك دقيقة أو دقيقتين بسبب الإحداثيات المعتمدة والتقريب."
         >
+          <ListRow label="ضبط أم القرى للمملكة" hint="أم القرى مع حساب العصر للجمهور" testId="saudi-calculation" onClick={() => {
+            updateAdhanPrefs({ calcMethod: "UmmAlQura", madhab: "Shafi" });
+            toast.success("تم ضبط أم القرى وحساب العصر للجمهور");
+          }} />
           <div className="list-row list-row--plain">
             <label htmlFor="calc-method" className="list-row__body list-row__label">
               الطريقة
@@ -337,11 +335,10 @@ export default function AdhanSettings() {
         </ListSection>
 
         {native && (
-          <ListSection title="حالة التنبيهات" footer="للتأكد من وصول التنبيهات على جهازك. لا تُعرض الإحداثيات هنا.">
+          <ListSection title="حالة التنبيهات" footer={platform === "ios" ? "اختر التسليم الفوري لتنبيهات مصحفك في إعدادات الآيفون، واستثنِ التطبيق من ملخص الإشعارات والتركيز لتجنب تأخير التنبيه." : "راجع إذن التنبيه في الوقت الدقيق وإعدادات البطارية إذا تأخرت التنبيهات."}>
             <ListRow label="إذن الإشعارات" value={permissionLabel} />
             {platform === "android" && <ListRow label="التنبيه في الوقت الدقيق" value={exact === "granted" ? "مسموح" : exact === "denied" ? "غير مسموح" : "—"} />}
             {timeZone && <ListRow label="المنطقة الزمنية للجهاز" value={<span dir="ltr">{timeZone}</span>} />}
-            <ListRow icon="bell" label="إرسال إشعار تجريبي" hint="بالصوت والمؤذن المختارين، بعد ٥ ثوانٍ" onClick={() => void test()} testId="test-notification" />
             <ListRow icon="info" label="عرض التنبيهات المجدولة" onClick={() => void loadDiagnostics()} testId="load-diagnostics" />
             {diag && (
               <div className="px-4 py-3 text-xs leading-relaxed" data-testid="diagnostics">

@@ -174,7 +174,7 @@ export async function lookupPlaceName(c: Coords): Promise<string> {
     );
     const d = await r.json();
     const name = d.address?.city || d.address?.town || d.address?.village || d.address?.county || d.address?.state || "";
-    if (name) placeStore.set(String(name).slice(0, 120));
+    if (name && coordsStore.get()?.lat === c.lat && coordsStore.get()?.lng === c.lng) placeStore.set(String(name).slice(0, 120));
     return name;
   } catch {
     return "";
@@ -195,7 +195,11 @@ export function requestLocation(): Promise<Coords> {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const c = parseCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        if (!c || !Number.isFinite(pos.coords.accuracy) || pos.coords.accuracy < 0 || pos.coords.accuracy > 1000) {
+          reject(new Error("inaccurate-location"));
+          return;
+        }
         coordsStore.set(c);
         // The old name belongs to the old coordinates; clear it so an offline lookup never leaves a wrong city.
         placeStore.set("");
@@ -203,7 +207,7 @@ export function requestLocation(): Promise<Coords> {
         resolve(c);
       },
       (err) => reject(err),
-      { enableHighAccuracy: false, timeout: 10000 },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
     );
   });
 }

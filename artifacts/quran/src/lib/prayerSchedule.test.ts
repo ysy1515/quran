@@ -12,8 +12,8 @@ import {
   scheduleDays,
   SCHEDULE_DAYS,
   soundFor,
-  TEST_NOTIFICATION_ID,
 } from "./prayerSchedule";
+import { SAUDI_CITIES } from "./cities";
 import { ANDROID_PRAYER_DEFAULT_CHANNEL, MUEZZINS } from "./muezzins";
 
 const KHAMIS = { lat: 18.3, lng: 42.7333 };
@@ -35,7 +35,7 @@ describe("notification IDs", () => {
           expect(id).toBeLessThan(REFRESH_NOTICE_ID);
         }
     }
-    expect(TEST_NOTIFICATION_ID).toBeLessThanOrEqual(PRAYER_ID_MAX);
+    expect(REFRESH_NOTICE_ID).toBeLessThanOrEqual(PRAYER_ID_MAX);
   });
 
   it("do not depend on the time of day", () => {
@@ -138,4 +138,18 @@ describe("sound configuration", () => {
   it("every planned notification names a sound (iOS is silent without one)", () => {
     for (const n of planPrayerNotifications(KHAMIS, { ...ON, reminderMinutes: 5 }, NOW, "ios")) expect(n.sound).toBeTruthy();
   });
+});
+
+// Check consistency across the supported cities and seasons, including Ramadan.
+// This verifies scheduling against the displayed calculation, not an official timetable.
+it.each(SAUDI_CITIES)("schedules $name at its displayed Umm al-Qura time across the year", (city) => {
+    for (let month = 0; month < 12; month++) {
+      const now = new Date(2027, month, 15, 0);
+      const plan = planPrayerNotifications(city.coords, ON, now, "ios");
+      for (const n of plan.filter((n) => n.kind === "adhan")) {
+        const displayed = prayerTimesFor(city.coords, n.at, ON).find((t) => t.key === n.prayer)!;
+        expect(n.at.getTime()).toBe(displayed.time.getTime());
+        expect(n.at.getTime()).toBe(n.prayerTime!.getTime());
+      }
+    }
 });

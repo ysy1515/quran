@@ -13,7 +13,7 @@ const TABS = [
 test("enables adhan on the first click after acquiring location and persists across reload", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator.geolocation, "getCurrentPosition", {
-      value: (success: PositionCallback) => success({ coords: { latitude: 18.3, longitude: 42.7333 } } as GeolocationPosition),
+      value: (success: PositionCallback) => success({ coords: { latitude: 18.3, longitude: 42.7333, accuracy: 10 } } as GeolocationPosition),
     });
     Object.defineProperty(Notification, "requestPermission", { value: async () => "granted" });
   });

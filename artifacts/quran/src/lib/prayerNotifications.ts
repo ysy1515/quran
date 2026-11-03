@@ -5,8 +5,6 @@ import {
   planPrayerNotifications,
   PRAYER_ID_MAX,
   PRAYER_ID_MIN,
-  soundFor,
-  TEST_NOTIFICATION_ID,
   type PlannedNotification,
   type Platform,
 } from "./prayerSchedule";
@@ -102,33 +100,35 @@ function toSchema(n: PlannedNotification) {
 const scheduled = new Map<string, string>();
 let queue: Promise<unknown> = Promise.resolve();
 
-export function syncPrayerNotifications(coords: Coords | null, prefs: AdhanPrefs, now = new Date()): Promise<SyncResult> {
+export function syncPrayerNotifications(coords: Coords | null, prefs: AdhanPrefs, now?: Date): Promise<SyncResult> {
   const run = queue.then(() => doSync(coords, prefs, now));
   queue = run.catch(() => undefined);
   return run;
 }
 
-async function doSync(coords: Coords | null, prefs: AdhanPrefs, now: Date): Promise<SyncResult> {
+async function doSync(coords: Coords | null, prefs: AdhanPrefs, now?: Date): Promise<SyncResult> {
   if (!isCapacitorNative()) return { status: "unsupported", planned: 0, cancelled: 0 };
   try {
     const { LocalNotifications: ln } = await plugin();
-    const plan = planPrayerNotifications(coords, prefs, now, platform());
-    const wanted = new Map(plan.map((n) => [String(n.id), n]));
-
     const pending = (await ln.getPending()).notifications.filter(
-      (n) => n.id >= PRAYER_ID_MIN && n.id <= PRAYER_ID_MAX && n.id !== TEST_NOTIFICATION_ID,
+      (n) => n.id >= PRAYER_ID_MIN && n.id <= PRAYER_ID_MAX,
     );
+    const permission = await checkDisplayPermission();
+    // Read the clock after native awaits: a suspended app must not replay old prayers.
+    const plan = planPrayerNotifications(coords, prefs, now ?? new Date(), platform());
+    const wanted = new Map(plan.map((n) => [String(n.id), n]));
     const obsolete = pending.filter((n) => !wanted.has(String(n.id)));
     if (obsolete.length) await ln.cancel({ notifications: obsolete.map((n) => ({ id: n.id })) });
     obsolete.forEach((n) => scheduled.delete(String(n.id)));
 
     if (!plan.length) return { status: "cleared", planned: 0, cancelled: obsolete.length };
-    if ((await checkDisplayPermission()) !== "granted") {
+    if (permission !== "granted") {
       return { status: "no-permission", planned: plan.length, cancelled: obsolete.length };
     }
 
     const pendingIds = new Set(pending.map((n) => String(n.id)));
-    const toSchedule = plan.filter((n) => !pendingIds.has(String(n.id)) || scheduled.get(String(n.id)) !== fingerprint(n));
+    const cutoff = now?.getTime() ?? Date.now();
+    const toSchedule = plan.filter((n) => n.at.getTime() > cutoff && (!pendingIds.has(String(n.id)) || scheduled.get(String(n.id)) !== fingerprint(n)));
     if (!toSchedule.length) return { status: "unchanged", planned: plan.length, cancelled: obsolete.length };
 
     // Same ID replaces the pending notification on both platforms.
@@ -156,34 +156,6 @@ export function cancelAllPrayerNotifications(): Promise<void> {
   });
   queue = run.catch(() => undefined);
   return run;
-}
-
-/** Fires one notification in 5 seconds with the same sound and channel as the prayer alerts. */
-export async function sendTestNotification(prefs: Pick<AdhanPrefs, "alertSound" | "muezzinId">): Promise<boolean> {
-  if (!isCapacitorNative()) return false;
-  try {
-    const { LocalNotifications: ln } = await plugin();
-    const { sound, channelId } = soundFor(prefs, platform());
-    await ln.schedule({
-      notifications: [
-        {
-          id: TEST_NOTIFICATION_ID,
-          title: "تجربة تنبيه الأذان",
-          body: "هكذا سيصلك تنبيه الصلاة بالصوت المختار",
-          schedule: { at: new Date(Date.now() + 5000), allowWhileIdle: true },
-          sound,
-          channelId,
-          smallIcon: SMALL_ICON,
-          iconColor: ICON_COLOR,
-          autoCancel: true,
-          extra: { route: "/adhan/settings", kind: "test" },
-        },
-      ],
-    });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export interface PendingSummary {

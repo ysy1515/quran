@@ -42,7 +42,7 @@ involved in prayer alerts: they are calculated and scheduled on the phone.
 ## Scheduling
 
 - Times: `adhan` library, Umm al-Qura by default, standard (Shafi'i/Maliki/Hanbali) Asr by default, Hanafi selectable. Isha is 90 min after Maghrib and **120 min in Ramadan** (Umm al-Qura convention; the library leaves this to the app). The day is the device's calendar day; the library returns absolute instants, so no UTC+3 offset is assumed anywhere in native scheduling.
-- IDs: `1000 + (day number mod 90) × 10 + prayer index (+5 for the early alert)`. Scheduling the same prayer again replaces it. 1990 = refresh notice, 1991 = test notification.
+- IDs: `1000 + (day number mod 90) × 10 + prayer index (+5 for the early alert)`. Scheduling the same prayer again replaces it. 1990 = refresh notice. Legacy test ID 1991 is removed on sync.
 - Window: 7 days. On iOS it shrinks to fit the 64-pending limit (5 days with early alerts on), keeping room for the 5 daily reminders.
 - Sync (`syncPrayerNotifications`): plans, cancels pending prayer IDs that are no longer wanted (location, madhab, method, prayers, sound, snooze or disable changed), and schedules only new or changed ones. Calls are queued so they never interleave.
 - A timed snooze skips alerts until it ends; "until manual resume" cancels them all.
@@ -68,8 +68,7 @@ When upgrading the plugin, check whether these are still needed and regenerate t
 
 Adhan settings → "حالة التنبيهات" (native app only): notification permission, exact-alarm
 status (Android), device time zone, today's calculated times, and the pending prayer
-notifications with ID, scheduled time and prayer time. "إرسال إشعار تجريبي" fires one
-notification in 5 seconds with the chosen sound and muezzin. Coordinates are never shown or
+notifications with ID, scheduled time and prayer time. The production test-alert action has been removed. Coordinates are never shown or
 logged; development builds log only counts.
 
 ## Must be verified on a real phone
@@ -77,7 +76,7 @@ logged; development builds log only counts.
 Automated tests run the calculation and scheduling logic and the web UI. They cannot prove
 what the OS does. Check on a physical iPhone and Android phone:
 
-1. Test notification plays the adhan clip (iOS) / full adhan (Android), screen locked and unlocked.
+1. A scheduled prayer notification plays the adhan clip (iOS) / full adhan (Android), screen locked and unlocked.
 2. "صوت الجهاز" plays the system sound (iOS relies on the plugin's documented fallback for the name `"default"`).
 3. Silent switch / Focus / DND silence it as expected; Bluetooth/headphones route as for any notification.
 4. A prayer alert arrives at the minute shown (Android: with and without exact-alarm permission, phone idle for an hour).
