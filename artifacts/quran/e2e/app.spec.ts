@@ -101,7 +101,7 @@ test.describe("layout", () => {
   for (const width of [320, 390, 430]) {
     test(`no horizontal overflow at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 700 });
-      for (const path of ["/", "/khatmah/new", "/athkar", "/athkar/morning", "/adhan", "/adhan/settings", "/index", "/index?tab=juz", "/more", "/dhikr", "/mushaf/2", "/bookmarks", "/settings"]) {
+      for (const path of ["/", "/khatmah/new", "/athkar", "/athkar/morning", "/adhan", "/adhan/settings", "/index", "/index?tab=juz", "/more", "/dhikr", "/mushaf/2", "/bookmarks", "/settings", "/qibla"]) {
         await open(page, path);
         const overflow = await page.evaluate(() =>
           [...document.querySelectorAll<HTMLElement>("body *")].filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1).length,
@@ -445,4 +445,17 @@ test.describe("public pages", () => {
     await expect(page.getByTestId("privacy-updated")).toContainText("آخر تحديث");
     await expect(page.getByTestId("operator-name")).toHaveCount(APP_CONFIG.operatorName ? 1 : 0);
   });
+});
+
+test("header Qibla shortcut opens the compass from every main screen and returns", async ({ page }) => {
+  for (const path of ["/", "/athkar", "/adhan", "/index", "/more", "/mushaf/2", "/adhan/settings"]) {
+    await open(page, path);
+    await page.getByTestId("header-qibla").click();
+    await expect(page).toHaveURL(/\/qibla$/);
+    await expect(page.getByRole("img", { name: "الكعبة المشرفة" })).toBeVisible();
+    await expect(page.getByTestId("header-qibla")).toHaveAttribute("aria-pressed", "true");
+    await page.getByTestId("header-qibla").click();
+    await page.getByTestId("header-back").click();
+    await expect(page).toHaveURL(new RegExp(path === "/" ? "/$" : `${path}$`));
+  }
 });

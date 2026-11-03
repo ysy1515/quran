@@ -68,7 +68,18 @@ export default function Qibla() {
   return (
     <Screen title="القبلة" back="/more">
       <div className="px-5 py-6 space-y-6 text-center">
-        <p className="text-sm text-muted-foreground">اتجاه الكعبة المشرفة من موقعك</p>
+        <div className="flex flex-col items-center gap-2" data-testid="qibla-kaaba">
+          <svg role="img" aria-label="الكعبة المشرفة" width="72" height="72" viewBox="0 0 80 80">
+            <path d="M10 24 43 12 70 24 37 38Z" fill="#343833" />
+            <path d="M10 24 37 38V70L10 55Z" fill="#20271f" />
+            <path d="M37 38 70 24V55L37 70Z" fill="#121b14" />
+            <path d="M10 32 37 46V52L10 38Z" fill="#c7a447" />
+            <path d="M37 46 70 32V38L37 52Z" fill="#e5c569" />
+            <path d="M49 49 58 45V60L49 64Z" fill="#c7a447" />
+          </svg>
+          <p className="font-bold">الكعبة المشرفة</p>
+          <p className="text-sm text-muted-foreground">أدر الهاتف حتى يتجه السهم إلى الكعبة في الأعلى</p>
+        </div>
         <div className={`relative mx-auto w-64 h-64 rounded-full border-4 flex items-center justify-center ${aligned ? "border-primary bg-primary/10" : "border-border bg-card"}`}>
           <span className="absolute top-3 text-sm">أعلى الهاتف</span>
           {turn !== null ? (
