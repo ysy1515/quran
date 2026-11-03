@@ -9,6 +9,7 @@ import { syncPrayerNotifications } from "@/lib/prayerNotifications";
 import { shouldPlayFullAdhanOnTap } from "@/lib/notificationTap";
 import { muezzinFor } from "@/lib/muezzins";
 import { playAdhan } from "@/lib/adhanPlayer";
+import { maybeRequestReview, recordReviewVisit } from "@/lib/appReview";
 
 const RESYNC_INTERVAL_MS = 30 * 60_000;
 
@@ -18,10 +19,27 @@ const RESYNC_INTERVAL_MS = 30 * 60_000;
  * status bar matches the green header, and tapping a reminder opens its screen.
  */
 export default function AppEffects() {
-  const [, navigate] = useLocation();
+  const [route, navigate] = useLocation();
   const prefs = useAdhanPrefs();
   const coords = useCoords();
   const { resolvedTheme } = useTheme();
+
+  // Ask only on the home screen, after established use, never over the reader.
+  useEffect(() => {
+    if (getCapacitorPlatform() !== "ios") return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const consider = () => {
+      clearTimeout(timer);
+      if (document.visibilityState !== "visible") return;
+      recordReviewVisit();
+      if (route === "/") timer = setTimeout(() => {
+        if (document.visibilityState === "visible") void maybeRequestReview();
+      }, 4000);
+    };
+    consider();
+    document.addEventListener("visibilitychange", consider);
+    return () => { clearTimeout(timer); document.removeEventListener("visibilitychange", consider); };
+  }, [route]);
 
   // Settings or location changed: bring the pending prayer notifications in line.
   useEffect(() => {

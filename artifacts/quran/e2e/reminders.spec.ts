@@ -10,6 +10,7 @@ async function nativeBridge(page: Page, permission = "granted") {
       Preferences: ["get", "set"],
       LocalNotifications: ["requestPermissions", "checkPermissions", "getPending", "schedule", "cancel", "addListener", "removeListener"],
       StatusBar: ["setStyle"],
+      AppReview: ["requestReview", "openStoreReview"],
     };
     Object.assign(window, {
       webkit: { messageHandlers: { bridge: {} } },
@@ -18,6 +19,11 @@ async function nativeBridge(page: Page, permission = "granted") {
           name, methods: names.map((name) => ({ name, rtype: "promise" })),
         })),
         nativePromise: async (plugin: string, method: string, options: Record<string, unknown> = {}) => {
+          if (plugin === "AppReview") {
+            const key = `native:review:${method}`;
+            localStorage.setItem(key, String(Number(localStorage.getItem(key) ?? 0) + 1));
+            return { requested: true, opened: true };
+          }
           if (plugin === "Preferences") {
             const key = `native:${options.key}`;
             if (method === "get") return { value: localStorage.getItem(key) };
@@ -86,4 +92,44 @@ test("native prayer permission, test alert and pending diagnostics respond", asy
   expect(pending[0].extra.kind).toBe("test");
   expect(pending[0].sound).toBeTruthy();
   expect(new Date(pending[0].schedule.at).getTime()).toBeGreaterThan(Date.now() - 10000);
+});
+
+test("native prayer switch schedules audible alerts and cancels them when disabled", async ({ page }) => {
+  await nativeBridge(page);
+  await page.goto("/adhan/settings");
+  await page.getByTestId("choose-city").click();
+  await page.getByTestId("city-khamis-mushait").click();
+  await page.getByTestId("adhan-enabled").click();
+  await expect(page.getByTestId("adhan-enabled")).toHaveAttribute("aria-checked", "true");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("native:pending") ?? "[]").length)).toBeGreaterThan(20);
+  const pending = await page.evaluate(() => JSON.parse(localStorage.getItem("native:pending") ?? "[]"));
+  expect(pending.every((n: { sound: string; schedule: { at: string } }) => !!n.sound && new Date(n.schedule.at).getTime() > Date.now() - 10000)).toBe(true);
+  await page.reload();
+  await expect(page.getByTestId("adhan-enabled")).toHaveAttribute("aria-checked", "true");
+  await page.getByTestId("adhan-enabled").click();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("native:pending") ?? "[]").length)).toBe(0);
+});
+
+test("rate app opens the native store review action and persists the cooldown", async ({ page }) => {
+  await nativeBridge(page);
+  await page.goto("/more");
+  await page.getByRole("button", { name: "تقييم التطبيق" }).click();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("native:review:openStoreReview"))).toBe("1");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("native:quran.review.v1") ?? "{}").manualOpenedAt)).toBeGreaterThan(0);
+});
+
+test("automatic review waits for established use and is not repeated after reload", async ({ page }) => {
+  await nativeBridge(page);
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem("review-seeded")) return;
+    sessionStorage.setItem("review-seeded", "1");
+    localStorage.setItem("native:quran.review.v1", JSON.stringify({ firstSeen: Date.now() - 8 * 86400000,
+      activeDays: ["2026-10-20", "2026-10-21", "2026-10-22"], attempts: [], manualOpenedAt: null }));
+    localStorage.setItem("native:quran.readingTime.v1", JSON.stringify({ seconds: 650, since: "2026-10-20T12:00:00Z" }));
+  });
+  await page.goto("/");
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("native:review:requestReview")), { timeout: 8000 }).toBe("1");
+  await page.reload();
+  await page.waitForTimeout(4500);
+  expect(await page.evaluate(() => localStorage.getItem("native:review:requestReview"))).toBe("1");
 });

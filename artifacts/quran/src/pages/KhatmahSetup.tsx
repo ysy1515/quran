@@ -67,7 +67,7 @@ export default function KhatmahSetup() {
   return (
     <Screen title="ختمة جديدة" back="/">
       <div className="screen__inner pb-10 page-enter">
-        <ListSection title="مقدار الورد">
+        <ListSection title="مقدار الورد" footer="اختر المقدار المناسب لك. الجزء الكامل = نصفان = أربعة أرباع = ثمانية أثمان.">
           {PLAN_PRESETS.map((p) => {
             const checked = choice.kind === "preset" && choice.id === p.id;
             const count = portionCount({ unit: p.unit, size: p.size, portions: 1, startJuz });

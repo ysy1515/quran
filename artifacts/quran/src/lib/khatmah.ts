@@ -184,11 +184,17 @@ export interface PlanPreset {
 }
 
 export const PLAN_PRESETS: PlanPreset[] = [
-  { id: "rub", label: "ربع حزب في كل ورد", hint: "٢٤٠ وردًا", unit: "rub", size: 1 },
-  { id: "half-hizb", label: "نصف حزب في كل ورد", hint: "١٢٠ وردًا", unit: "rub", size: 2 },
-  { id: "hizb", label: "حزب في كل ورد", hint: "٦٠ وردًا", unit: "rub", size: 4 },
-  { id: "juz", label: "جزء في كل ورد", hint: "٣٠ وردًا", unit: "rub", size: 8 },
+  { id: "rub", label: "ثُمن جزء في كل ورد", hint: "٢٤٠ وردًا", unit: "rub", size: 1 },
+  { id: "half-hizb", label: "ربع جزء في كل ورد", hint: "١٢٠ وردًا", unit: "rub", size: 2 },
+  { id: "hizb", label: "نصف جزء في كل ورد", hint: "٦٠ وردًا", unit: "rub", size: 4 },
+  { id: "juz", label: "جزء كامل في كل ورد", hint: "٣٠ وردًا", unit: "rub", size: 8 },
 ];
+
+export function portionSizeLabel(plan: Pick<KhatmahPlan, "unit" | "size">): string {
+  return plan.unit === "rub"
+    ? PLAN_PRESETS.find((p) => p.size === plan.size)?.label ?? "ورد حسب خطتك"
+    : "ورد من تقسيم الصفحات";
+}
 
 export const MIN_CUSTOM_PORTIONS = 3;
 

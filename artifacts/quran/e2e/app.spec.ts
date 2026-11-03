@@ -122,6 +122,27 @@ test.describe("layout", () => {
 });
 
 test.describe("khatmah", () => {
+  test("juz fractions show accurate totals and preserve the selected quarter-juz plan", async ({ page }) => {
+    await open(page, "/khatmah/new");
+    for (const [id, label, total] of [
+      ["rub", "ثُمن جزء في كل ورد", "٢٤٠"],
+      ["half-hizb", "ربع جزء في كل ورد", "١٢٠"],
+      ["hizb", "نصف جزء في كل ورد", "٦٠"],
+      ["juz", "جزء كامل في كل ورد", "٣٠"],
+    ]) {
+      const choice = page.getByTestId(`plan-${id}`);
+      await expect(choice).toContainText(label);
+      await choice.click();
+      await expect(page.getByTestId("plan-summary")).toContainText(total);
+    }
+    await page.getByTestId("plan-half-hizb").click();
+    await page.getByTestId("create-khatmah").click();
+    await expect(page.getByTestId("wird-size")).toHaveText("ربع جزء في كل ورد");
+    await page.reload();
+    await expect(page.getByTestId("wird-size")).toHaveText("ربع جزء في كل ورد");
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem("quran.khatmah.v1")!).plan.size)).toBe(2);
+  });
+
   test("start a plan, finish a wird, persist across reloads, undo", async ({ page }) => {
     await open(page, "/");
     await page.getByTestId("start-khatmah").click();

@@ -5,7 +5,7 @@ import { surahName, compareAyah, type AyahRef } from "@workspace/quran-meta";
 import Screen from "@/components/shell/Screen";
 import { Icon } from "@/components/icons/Icon";
 import FeatureArt from "@/components/art/FeatureArt";
-import { completeCurrentPortion, isWithin, undoLastPortion, useKhatmah, type Portion } from "@/lib/khatmah";
+import { completeCurrentPortion, isWithin, portionSizeLabel, undoLastPortion, useKhatmah, type Portion } from "@/lib/khatmah";
 import { useReadingProgress } from "@/lib/userData";
 import { ar, awradLabel, juzLabel, shortDate } from "@/lib/format";
 import { readerHref } from "@/lib/useQuranLinks";
@@ -246,6 +246,7 @@ export default function Home() {
         {k.plan && k.finished && <FinishedKhatmah />}
         {k.current && (
           <>
+            <p className="text-sm text-muted-foreground mb-3" data-testid="wird-size">{portionSizeLabel(k.plan!)}</p>
             <WirdCard portion={k.current} />
             <div className="grid grid-cols-[1.25fr_1fr] gap-3 mt-5">
               <Link href={continueHref} className="btn btn-primary" data-testid="continue-wird">

@@ -9,12 +9,15 @@ import { adhanPrefsStore, coordsStore, placeStore } from "./prayer";
 import { readingTimeStore } from "./readingTime";
 import { remindersStore } from "./reminders";
 import { progressStore, readingStopStore, settingsStore } from "./userData";
+import { reviewStore } from "./appReview";
 
 void [bookmarksStore, favoritesStore, dhikrStore, khatmahStore, adhanPrefsStore, coordsStore, placeStore];
 void [readingTimeStore, remindersStore, progressStore, readingStopStore, settingsStore];
+void reviewStore;
 
 /** Personal data kept in native storage on iOS/Android. Key names are unchanged from localStorage. */
 export const DURABLE_KEYS = [
+  "quran.review.v1",
   "quran.khatmah.v1",
   "quran.bookmarks.v1",
   "quran.favorites.v1",
